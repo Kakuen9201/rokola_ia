@@ -1,0 +1,307 @@
+{
+  "name": "Cosechadora_multi_RSS",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -880,
+        -80
+      ],
+      "id": "fb801f8e-e728-4f29-b19d-2b9c1f8af6b7",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": {
+          "customFields": "={{ $json.categoria }}"
+        }
+      },
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        -416,
+        -80
+      ],
+      "id": "bb408053-2277-4edb-bc1f-3131e7a4f4f1",
+      "name": "RSS Read",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT url, categoria FROM fuentes_rss WHERE activa = true;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -672,
+        -80
+      ],
+      "id": "3cb03f76-c264-4b50-ad76-f9b27cda7092",
+      "name": "Execute_SQL_query",
+      "notesInFlow": true,
+      "credentials": {
+        "postgres": {
+          "id": "8zQqkIIVzGzMJrii",
+          "name": "Postgres account"
+        }
+      },
+      "notes": "Lee DB RSS"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "20c39400-c0da-4f01-b866-927ea86aaf9c",
+              "name": "source_url",
+              "value": "={{ $json.link }}",
+              "type": "string"
+            },
+            {
+              "id": "90d86ea9-8169-4386-8cfd-db34b763fb96",
+              "name": "raw_content",
+              "value": "={{ $json.content }}",
+              "type": "string"
+            },
+            {
+              "id": "a57fc3a4-5991-46b1-b400-549224db57d3",
+              "name": "metadata",
+              "value": "={{ JSON.stringify({\n  autor: $json.creator || $json.author || \"Anónimo\",\n  titulo: $json.title || \"Sin título\",\n  fecha: $json.metadata?.fecha || $json.pubDate || $json.isoDate || null,\n  tags: $json.tagsLimpios ?? null\n}) }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -144,
+        -80
+      ],
+      "id": "1d8fec65-c068-4252-9e7a-f047b94c101f",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "list",
+          "value": "raw_datasets"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {
+            "category": "={{ $json.category }}",
+            "raw_content": "={{ $json.raw_content }}",
+            "metadata": "={{ $json.metadata }}",
+            "created_at": "={{ $json.metadata.fecha }}",
+            "source_url": "={{ $json.source_url }}"
+          },
+          "matchingColumns": [
+            "source_url"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "source_url",
+              "displayName": "source_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "category",
+              "displayName": "category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "raw_content",
+              "displayName": "raw_content",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "clean_content",
+              "displayName": "clean_content",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false,
+              "removed": false
+            },
+            {
+              "id": "embedding",
+              "displayName": "embedding",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false,
+              "removed": false
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "metadata",
+              "displayName": "metadata",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "object",
+              "canBeUsedToMatch": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        304,
+        -80
+      ],
+      "id": "a0270993-16fb-4973-918b-4f09870668ab",
+      "name": "Insert or update rows in a table",
+      "credentials": {
+        "postgres": {
+          "id": "8zQqkIIVzGzMJrii",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * N8N Code node (JavaScript) — Salida compatible con Postgres \"Map Automatically\"\n * Emite SOLO: source_url, category, raw_content, metadata\n * REGLA: si ya viene raw.source_url, se usa tal cual (no se recalcula).\n */\n\nfunction asText(v) {\n  if (v === null || v === undefined) return \"\";\n  if (typeof v === \"string\") return v;\n  if (typeof v === \"number\" || typeof v === \"boolean\") return String(v);\n  if (typeof v === \"object\") {\n    return String(\n      v._ ?? v.href ?? v.url ?? v.value ?? v.text ?? v[\"#text\"] ?? JSON.stringify(v)\n    );\n  }\n  return String(v);\n}\n\nfunction cleanText(htmlOrText) {\n  return asText(htmlOrText)\n    .replace(/<[^>]*>?/gm, \"\")\n    .replace(/\\s+/g, \" \")\n    .trim();\n}\n\nfunction extractStableDate(raw) {\n  // Prioriza metadata.fecha (ya normalizada en tu Edit Fields)\n  return asText(raw.metadata?.fecha || raw.pubDate || raw.isoDate).trim();\n}\n\nfunction extractUrl(raw, idx) {\n  // 0) PRIORIDAD ABSOLUTA: si tu pipeline ya construyó source_url, úsalo\n  const pre = asText(raw.source_url).trim();\n  if (pre) return pre;\n\n  // 1) Si no existe, busca en los campos típicos del RSS\n  const candidates = [\n    raw.link,\n    raw.url,\n    raw.guid,\n    raw.id,\n    raw.permalink,\n    raw.href,\n    raw.link?.href,\n    raw.link?.url,\n    raw.enclosure?.url,\n  ];\n\n  for (const c of candidates) {\n    const s = asText(c).trim();\n    if (s && /^https?:\\/\\//i.test(s)) return s;\n  }\n\n  // 2) Fallback estable (solo si no hay URL real)\n  const title = asText(raw.title || raw.metadata?.titulo).trim();\n  const date = extractStableDate(raw);\n  const fallback = [title, date].filter(Boolean).join(\" | \");\n  return fallback || `item:${idx}`;\n}\n\nfunction normalizeCats(input) {\n  if (!input) return [];\n  if (Array.isArray(input)) return input;\n\n  if (typeof input === \"string\") {\n    const s = input.trim().replace(/^{|}$/g, \"\");\n    if (!s) return [];\n    return s.split(\",\").map(x => x.trim());\n  }\n\n  if (typeof input === \"object\") return [input];\n  return [];\n}\n\nfunction cleanCat(c) {\n  if (c && typeof c === \"object\") {\n    c = c._ ?? c.name ?? c.value ?? c.term ?? c.label ?? c[\"#text\"] ?? \"\";\n  }\n  return asText(c).replace(/^\"|\"$/g, \"\").trim().toLowerCase();\n}\n\nfunction extractCatSignals(raw) {\n  // Si en tu pipeline ya guardaste tags dentro de metadata.tags, úsalo también\n  const candidates = [\n    raw.metadata?.tags,\n    raw.categories,\n    raw.category,\n    raw.tags,\n    raw[\"dc:subject\"],\n    raw[\"media:keywords\"],\n    raw.categories?.category,\n  ].filter(Boolean);\n\n  const cats = candidates\n    .flatMap(x => normalizeCats(x))\n    .map(cleanCat)\n    .filter(Boolean);\n\n  return [...new Set(cats)];\n}\n\nfunction pickGeneralCategory({ url, title, content, cats }) {\n  const text = `${url}\\n${title}\\n${content}\\n${cats.join(\" \")}`.toLowerCase();\n\n  if (/\\b(health|healthcare|medicine|biotech|clinical|hospital|doctor|patients?)\\b/.test(text)) return \"Salud\";\n  if (/\\b(security|cyber|breach|vulnerability|malware|ransomware|compliance|shadow ai)\\b/.test(text)) return \"Seguridad\";\n  if (/\\b(hardware|gadgets?|device|wearable|chip|semiconductor|robot|robotics|humanoid|drone)\\b/.test(text)) return \"Hardware\";\n  if (/\\b(startup|fundraising|series [a-z]|valuation|arr|revenue|vc|venture|acquisition|ipo)\\b/.test(text)) return \"Negocios\";\n  if (/\\b(apps?|whatsapp|telegram|social|community|forum|reddit|hacker news|hn)\\b/.test(text)) return \"Comunidad\";\n  if (/\\b(ai|artificial intelligence|llm|gpt|agentic|chatbot|openai|anthropic|model)\\b/.test(text)) return \"IA\";\n\n  return \"Tecnología\";\n}\n\nconst items = $input.all();\nconst results = [];\n\nfor (let idx = 0; idx < items.length; idx++) {\n  const raw = items[idx].json || {};\n\n  // 1) source_url correcto (no se degrada si ya viene)\n  const source_url = extractUrl(raw, idx);\n\n  // 2) titulo y contenido\n  const titulo = asText(raw.metadata?.titulo || raw.title).trim() || \"Sin título\";\n  const raw_content = cleanText(raw.raw_content || raw.content || raw.contentSnippet || raw.description || \"\");\n\n  // 3) tags (si existen) para macro-categoría y para preservar diversidad dentro de metadata\n  const cats = extractCatSignals(raw);\n\n  // 4) category general en el campo category (como pediste)\n  const category = pickGeneralCategory({ url: source_url, title: titulo, content: raw_content, cats });\n\n  // 5) metadata  (jsonb)\n  const fecha = extractStableDate(raw) || \"Sin fecha\"; // si prefieres NUNCA null\n  const metadata = {\n    autor: asText(raw.metadata?.autor || raw.creator || raw.author).trim() || \"Anónimo\",\n    titulo,\n    fecha,\n  };\n\n  if (cats.length) metadata.tags = cats;\n\n  results.push({ json: { source_url, category, raw_content, metadata } });\n}\n\nreturn results;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        80,
+        -80
+      ],
+      "id": "49139971-0512-470b-8bfc-d415f265a6cd",
+      "name": "Code in JavaScript"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Execute_SQL_query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS Read": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute_SQL_query": {
+      "main": [
+        [
+          {
+            "node": "RSS Read",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Insert or update rows in a table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "b063ed84-90d8-46a8-8186-eb8dddb84e4f",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "82618f443267ad1414b6d8ca7f65d3c3db2c014897410bf22bd7e8b137ec99bc"
+  },
+  "id": "bYmi7Sxep5GOo0TD",
+  "tags": []
+}
