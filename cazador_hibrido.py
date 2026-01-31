@@ -50,10 +50,8 @@ def _request_deezer(term):
         response = requests.get(DEEZER_URL, params=params, timeout=5)
         if response.status_code == 200:
             data = response.json()
-            # Deezer devuelve una lista en 'data'
             if "data" in data and len(data["data"]) > 0:
                 album = data["data"][0].get("album", {})
-                # Prioridad: XL (1000px) -> Big (500px) -> Medium
                 return album.get("cover_xl") or album.get("cover_big") or album.get("cover_medium")
     except:
         pass
@@ -66,31 +64,28 @@ def buscar_inteligente(artist, title):
     artist_clean = limpiar_texto(artist)
     title_clean = limpiar_texto(title)
 
-    # 1. ITUNES NORMAL (Artista + Canción)
+    # 1. ITUNES NORMAL
     url = _request_itunes(f"{artist} {title}")
     if url: return url, "iTunes Normal"
 
-    # 2. DEEZER NORMAL (Artista + Canción) -> ¡NUEVO!
+    # 2. DEEZER NORMAL
     url = _request_deezer(f"{artist} {title}")
     if url: return url, "Deezer Normal"
 
-    # Verificamos si la limpieza cambia algo para no repetir búsquedas inútiles
     if artist != artist_clean or title != title_clean:
         # 3. ITUNES LIMPIO
         url = _request_itunes(f"{artist_clean} {title_clean}")
         if url: return url, "iTunes Limpio"
         
-        # 4. DEEZER LIMPIO -> ¡NUEVO!
+        # 4. DEEZER LIMPIO
         url = _request_deezer(f"{artist_clean} {title_clean}")
         if url: return url, "Deezer Limpio"
 
-    # 5. SOLO TÍTULO (La Nuclear)
+    # 5. SOLO TÍTULO
     if len(title_clean) > 3:
-        # 5.1 iTunes Solo Título
         url = _request_itunes(title_clean)
         if url: return url, "iTunes Título"
         
-        # 5.2 Deezer Solo Título -> ¡NUEVO!
         url = _request_deezer(title_clean)
         if url: return url, "Deezer Título"
 
@@ -105,7 +100,6 @@ def main():
     conn = psycopg2.connect(**DB_PARAMS)
     cur = conn.cursor()
 
-    # Buscamos TODO lo que siga sin imagen
     print("🔍 Buscando canciones restantes sin imagen...")
     cur.execute("SELECT id, artist, clean_title FROM musica_startup WHERE cover_image IS NULL OR cover_image = ''")
     rows = cur.fetchall()
@@ -123,7 +117,11 @@ def main():
 
     try:
         for i, row in enumerate(rows):
-            song_id, artist, title = row
+            song_id, artist_raw, title_raw = row
+            
+            # --- CORRECCIÓN: Manejo seguro de NULLs ---
+            artist = artist_raw if artist_raw else "Desconocido"
+            title = title_raw if title_raw else "Sin Título"
             
             # Print de progreso dinámico
             print(f"[{i+1}/{total}] 🎵 {artist[:15]}.. - {title[:15]}..", end=" ", flush=True)
@@ -133,13 +131,12 @@ def main():
             if image_url:
                 cur.execute("UPDATE musica_startup SET cover_image = %s WHERE id = %s", (image_url, song_id))
                 conn.commit()
-                # Borramos la linea anterior y mostramos éxito verde
-                print(f"\r[{i+1}/{total}] ✅ {artist[:15]}.. - {title[:15]}.. (Vía: {metodo})   ")
+                # Espacios extra al final para limpiar la línea
+                print(f"\r[{i+1}/{total}] ✅ {artist[:15]}.. - {title[:15]}.. (Vía: {metodo})     ")
                 encontradas += 1
             else:
-                print(f"\r[{i+1}/{total}] ❌ {artist[:15]}.. - {title[:15]}.. (No hallada)      ")
+                print(f"\r[{i+1}/{total}] ❌ {artist[:15]}.. - {title[:15]}.. (No hallada)        ")
             
-            # Un pequeño sleep para respetar ambas APIs
             time.sleep(0.1)
 
     except KeyboardInterrupt:

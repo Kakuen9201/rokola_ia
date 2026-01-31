@@ -19,12 +19,6 @@ DB_PARAMS = {
     "port": "5432"
 }
 
-def limpiar_nombre(nombre_archivo):
-    nombre = re.sub(r'\.[a-zA-Z0-9]{3,4}$', '', nombre_archivo)
-    nombre = re.sub(r'^\d+\s*[-_.]?\s*', '', nombre)
-    nombre = nombre.replace('_', ' ')
-    return nombre.strip()
-
 def limpiar_resumen(texto):
     if not texto: return None
     texto_limpio = re.sub(r'<a href=.*?>.*?</a>', '', texto)
@@ -32,6 +26,7 @@ def limpiar_resumen(texto):
 
 def obtener_genero_artista(artista):
     """Si la canción no tiene género, buscamos el del artista"""
+    if not artista: return None
     url = "http://ws.audioscrobbler.com/2.0/"
     params = {"method": "artist.getTopTags", "artist": artista, "api_key": API_KEY, "format": "json"}
     try:
@@ -57,25 +52,49 @@ def extraer_mejor_tag(tags):
     return None
 
 def consultar_lastfm(artista, cancion):
+    # Si no tenemos artista, intentamos buscar solo por canción (menos preciso, pero mejor que nada)
+    if not artista:
+        params = {"method": "track.search", "track": cancion, "limit": 1}
+    else:
+        params = {"method": "track.getInfo", "artist": artista, "track": cancion, "autocorrect": 1}
+
     url = "http://ws.audioscrobbler.com/2.0/"
-    params = {
-        "method": "track.getInfo", "api_key": API_KEY, "artist": artista, "track": cancion,
-        "autocorrect": 1, "lang": "es", "format": "json"
-    }
+    params["api_key"] = API_KEY
+    params["lang"] = "es"
+    params["format"] = "json"
+    
     info = {
         "found": False, "mbid": None, "album": None, "image": None, 
-        "genre": None, "summary": None, "duration": 0, "raw": None
+        "genre": None, "summary": None, "duration": 0, "raw": None,
+        "real_artist_name": None, "real_track_name": None
     }
+    
     try:
         response = requests.get(url, params=params, timeout=5)
         data = response.json()
 
-        if "track" in data:
-            t = data["track"]
+        # Adaptador para track.search vs track.getInfo
+        track_data = None
+        if "track" in data and isinstance(data["track"], dict):
+            track_data = data["track"] # Caso track.getInfo
+        elif "results" in data and "trackmatches" in data["results"]:
+             matches = data["results"]["trackmatches"]["track"]
+             if matches:
+                 # Si buscamos solo por nombre, hacemos una segunda llamada con artista+track encontrado
+                 found_artist = matches[0]["artist"]
+                 found_track = matches[0]["name"]
+                 return consultar_lastfm(found_artist, found_track)
+
+        if track_data:
+            t = track_data
             info["found"] = True
             info["mbid"] = t.get("mbid")
-            info["raw"] = json.dumps(t) # ¡Aquí guardamos el JSON completo!
+            info["raw"] = json.dumps(t)
             info["duration"] = int(t.get("duration", "0"))
+            info["real_track_name"] = t.get("name")
+            
+            if "artist" in t:
+                info["real_artist_name"] = t["artist"].get("name")
 
             if "album" in t:
                 info["album"] = t["album"].get("title")
@@ -88,6 +107,7 @@ def consultar_lastfm(artista, cancion):
                 info["summary"] = limpiar_resumen(t["wiki"].get("summary"))
             if "toptags" in t:
                 info["genre"] = extraer_mejor_tag(t["toptags"].get("tag"))
+                
     except Exception as e:
         print(f"⚠️ Error API: {e}")
     
@@ -97,14 +117,14 @@ def procesar_musica():
     conn = psycopg2.connect(**DB_PARAMS)
     cur = conn.cursor()
 
-    print("🔎 Buscando canciones pendientes de procesar (lastfm_processed = FALSE)...")
+    print("🔎 Buscando canciones pendientes (lastfm_processed = FALSE)...")
     
-    # 1. SELECTOR CORREGIDO: Usamos la bandera de control
+    # --- CORRECCIÓN 1: Usamos original_folder_name como artista y clean_title ---
+    # COALESCE(artist, original_folder_name): Si artist es NULL, usa la carpeta.
     sql_query = """
-        SELECT id, clean_title, artist 
+        SELECT id, clean_title, COALESCE(artist, original_folder_name) as search_artist
         FROM musica_startup 
         WHERE lastfm_processed = FALSE 
-        AND artist IS NOT NULL
         LIMIT 500
     """
     cur.execute(sql_query)
@@ -114,52 +134,52 @@ def procesar_musica():
     conteo_ok = 0
 
     for row in rows:
-        id_db, titulo, artista = row
-        titulo_limpio = limpiar_nombre(titulo)
+        id_db, titulo_limpio, artista_busqueda = row
         
-        info = consultar_lastfm(artista, titulo_limpio)
-        origen_genero = "Track"
-
-        # Fallback de Artista si falta género
-        if not info["genre"]:
-            genero_artista = obtener_genero_artista(artista)
+        # Validación extra por si title es None
+        if not titulo_limpio: titulo_limpio = "Unknown" 
+        
+        # --- CORRECCIÓN 2: Ya no limpiamos aquí, confiamos en SQL ---
+        info = consultar_lastfm(artista_busqueda, titulo_limpio)
+        
+        # Fallback de Género
+        if not info["genre"] and info["real_artist_name"]:
+            genero_artista = obtener_genero_artista(info["real_artist_name"])
             if genero_artista:
                 info["genre"] = genero_artista
-                origen_genero = "Artista"
 
         # UPDATE MAESTRO
-        if info["found"] or info["genre"]:
+        if info["found"]:
             sql_update = """
                 UPDATE musica_startup 
-                SET lastfm_processed = TRUE,  -- ¡Marcamos como listo!
-                    lastfm_mbid = COALESCE(%s, lastfm_mbid),
-                    album = COALESCE(%s, album),
-                    cover_image = COALESCE(%s, cover_image),
-                    genre = COALESCE(genre, %s), -- Solo llena si estaba vacío (respeta tu SQL masivo)
-                    music_summary = COALESCE(%s, music_summary),
+                SET lastfm_processed = TRUE,
+                    lastfm_mbid = %s,
+                    album = %s,
+                    cover_image = %s,
+                    genre = COALESCE(genre, %s),
+                    music_summary = %s,
                     duration_ms = GREATEST(duration_ms, %s),
-                    raw_metadata = COALESCE(%s, raw_metadata)
+                    raw_metadata = %s,
+                    artist = COALESCE(artist, %s), -- Guardamos el artista real si estaba vacío
+                    real_name = %s -- Guardamos el nombre real de la canción
                 WHERE id = %s
             """
-            # NOTA: En 'genre', usé COALESCE(genre, %s) al revés que antes. 
-            # Esto significa: "Si YA tengo género (ej. Salsa), MANTENLO. Si no, usa el de LastFM".
-            # Así respetamos tu curetaje masivo SQL.
-
             cur.execute(sql_update, (
                 info["mbid"], info["album"], info["image"], 
                 info["genre"], info["summary"], info["duration"], 
-                info["raw"], id_db
+                info["raw"], info["real_artist_name"], info["real_track_name"],
+                id_db
             ))
-            print(f"✅ {artista[:15]} - {titulo_limpio[:15]}... | Data Guardada")
+            print(f"✅ {titulo_limpio[:20]} -> {info['real_artist_name']} | OK")
             conteo_ok += 1
         
         else:
-            # Si LastFM no sabe nada, igual marcamos TRUE para sacarla de la cola
-            print(f"❌ {artista} - {titulo_limpio} (Sin datos)")
+            print(f"❌ {titulo_limpio[:20]} (No encontrado en LastFM)")
+            # Marcamos TRUE para no trabar la cola, pero no llenamos datos
             cur.execute("UPDATE musica_startup SET lastfm_processed = TRUE WHERE id = %s", (id_db,))
 
         conn.commit()
-        time.sleep(0.2) 
+        time.sleep(0.25) # Respeto a la API
 
     print(f"\n✨ Lote terminado. {conteo_ok} canciones enriquecidas.")
     cur.close()
