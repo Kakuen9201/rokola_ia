@@ -6,6 +6,10 @@
     <title>Rokola IA - Logos & Contexto</title>
     <link rel="icon" type="image/png" href="logos_&_contexto.png" />
 
+    <link rel="preconnect" href="https://drive.google.com" crossorigin>
+    <link rel="preconnect" href="https://content.googleapis.com" crossorigin>
+    <link rel="dns-prefetch" href="https://drive.google.com">
+
     <style>
         /* ==========================================================
            1. VARIABLES GLOBALES Y DISEÑO BASE
@@ -161,51 +165,81 @@
         .close-modal:hover { color: var(--primary); transform: scale(1.1); }
 
         /* ==========================================================
-           5. RESULTADOS: GRILLA VS LISTA (ESTILOS NUEVOS)
+           5. RESULTADOS: GRILLA VS LISTA (MEJORADO PARA MÓVIL)
            ========================================================== */
         
-        /* --- ESTILO GRILLA (CARDS) --- */
+        /* --- MODO GRILLA (CARDS) --- */
         .grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(135px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
             gap: 15px; width: 95%; max-width: 1000px; padding: 15px; flex: 1;
         }
         .card {
             background: var(--surface); border-radius: 8px; overflow: hidden;
             transition: all 0.2s ease; cursor: pointer; border: 1px solid transparent;
+            position: relative;
         }
         .card:hover { transform: translateY(-4px); border-color: var(--primary); box-shadow: 0 4px 20px rgba(0,0,0,0.4); }
         .cover-container { width: 100%; aspect-ratio: 1; overflow: hidden; position: relative; }
         .card img { width: 100%; height: 100%; object-fit: cover; transition: 0.5s; opacity: 0.9; }
         .card:hover img { opacity: 1; transform: scale(1.05); }
+        
         .play-overlay {
             position: absolute; inset: 0; display: flex; justify-content: center; align-items: center;
             background: rgba(0,0,0,0.4); opacity: 0; transition: 0.2s;
         }
         .card:hover .play-overlay { opacity: 1; }
         .play-icon { font-size: 2.5rem; color: var(--text); }
+        
         .info { padding: 10px; }
         .title { font-weight: 600; font-size: 0.9em; margin-bottom: 4px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .artist { color: var(--text-sec); font-size: 0.8em; }
 
-        /* --- ESTILO LISTA (TABLA DE METADATOS) --- */
+        /* --- MODO FICHA TÉCNICA (TABLA OPTIMIZADA) --- */
         .table-container {
             width: 95%; max-width: 1100px; margin: 20px auto;
-            overflow-x: auto; /* Scroll horizontal en móviles */
+            overflow-x: auto; /* Scroll suave en horizontal para móviles */
             background: #1e1e1e; border-radius: 12px; border: 1px solid #333;
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
         }
-        .meta-table { width: 100%; border-collapse: collapse; min-width: 700px; font-size: 0.9rem; }
-        .meta-table th {
-            text-align: left; padding: 15px; color: var(--primary);
-            border-bottom: 2px solid #333; font-weight: 700; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 1px;
-        }
-        .meta-table td {
-            padding: 12px 15px; border-bottom: 1px solid #2a2a2a; color: #ddd; vertical-align: middle;
-        }
-        .meta-table tr:last-child td { border-bottom: none; }
-        .meta-table tr:hover { background-color: rgba(255,255,255,0.05); }
         
+        .meta-table { 
+            width: 100%; 
+            border-collapse: separate; 
+            border-spacing: 0; 
+            min-width: 700px; /* Fuerza el scroll si la pantalla es menor a 700px */
+            font-size: 0.85rem; 
+        }
+
+        .meta-table th {
+            text-align: left; padding: 12px 15px; color: var(--primary);
+            border-bottom: 2px solid #333; font-weight: 700; 
+            text-transform: uppercase; font-size: 0.7rem; letter-spacing: 1px;
+            background: rgba(30,30,30,0.95); /* Encabezado fijo al hacer scroll vertical */
+            position: sticky; top: 0; z-index: 10;
+        }
+
+        .meta-table td {
+            padding: 10px 15px; 
+            border-bottom: 1px solid #2a2a2a; 
+            color: #ddd; 
+            vertical-align: top;
+        }
+
+        /* Columnas Compuestas (Tipografía) */
+        .col-main-text { font-weight: 600; font-size: 0.95rem; color: #fff; display: block; margin-bottom: 3px; }
+        .col-sub-text { font-size: 0.8rem; color: var(--text-sec); display: block; }
+        .col-detail { font-size: 0.75rem; color: #666; font-style: italic; }
+        
+        /* Badges (Etiquetas visuales) */
+        .badge {
+            display: inline-block; padding: 2px 6px; border-radius: 4px; 
+            font-size: 0.7rem; font-weight: 600; margin-top: 4px; margin-right: 4px;
+        }
+        .badge-year { background: #333; color: #fff; border: 1px solid #444; }
+        .badge-style { background: rgba(100, 181, 246, 0.15); color: var(--primary); }
+        .badge-format { border: 1px solid #555; color: #aaa; }
+
         .btn-table-play {
             background: transparent; border: 1px solid var(--text-sec); color: var(--text-sec);
             width: 32px; height: 32px; border-radius: 50%; cursor: pointer;
@@ -213,8 +247,9 @@
         }
         .btn-table-play:hover { border-color: var(--primary); color: var(--primary); transform: scale(1.1); }
 
+
         /* ==========================================================
-           6. PLAYER & FOOTER
+           6. PLAYER & FOOTER & LOADER
            ========================================================== */
         #embedded-player {
             position: fixed; bottom: -150px; left: 50%; transform: translateX(-50%);
@@ -232,6 +267,7 @@
         .player-artist { font-size: 0.75em; color: #888; }
         .iframe-container { flex: 1; position: relative; height: 40px; border-radius: 4px; }
         iframe.gdrive-frame { width: 100%; height: 100%; border: none; background: transparent; }
+        
         .blocker {
             position: absolute; top: 0; right: 0; bottom: 0; width: 90px;
             background-color: #181818; z-index: 10; pointer-events: auto;
@@ -241,6 +277,33 @@
         .close-player { background: none; border: none; color: #666; font-size: 1.5rem; cursor: pointer; padding: 0 10px; z-index: 2; }
         .close-player:hover { color: var(--text); }
         
+        /* Loader específico para el reproductor */
+        .player-loader {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background: #181818; z-index: 5;
+            display: flex; align-items: center; justify-content: center;
+            transition: opacity 0.3s;
+        }
+        .player-loader.hidden { opacity: 0; pointer-events: none; }
+        
+        .spinner-small {
+            width: 20px; height: 20px; border: 2px solid #333; 
+            border-top: 2px solid var(--primary); border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+
+        /* Subtítulos de las columnas del encabezado */
+        .th-sub {
+            display: block;           /* Para que baje a una nueva línea */
+            font-size: 0.55rem;       /* Letra bien pequeña */
+            font-weight: 400;         /* Letra fina (no negrita) */
+            color: #888;              /* Gris opaco */
+            text-transform: none;     /* Texto normal (no mayúsculas) */
+            margin-top: 3px;          /* Separación del título */
+            letter-spacing: 0;        /* Normalizar espaciado */
+            opacity: 0.8;
+        }
+
         @media (min-width: 600px) { .player-info { display: block; } }
 
         .loader {
@@ -253,6 +316,41 @@
         footer { width: 100%; text-align: center; padding: 25px; color: #555; font-size: 0.8rem; margin-top: auto; border-top: 1px solid #1a1a1a; }
         .tm-bold { color: var(--text-sec); font-weight: 700; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* --- ESTADOS DE SELECCIÓN (UX MEJORADO) --- */
+        
+        /* Estado Activo para la Tarjeta (Grid) */
+        .card.active-card {
+            border-color: var(--primary);
+            box-shadow: 0 0 15px rgba(100, 181, 246, 0.4);
+        }
+        /* Mantenemos el overlay visible y oscuro cuando está seleccionado */
+        .card.active-card .play-overlay {
+            opacity: 1;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: grayscale(100%); /* Efecto elegante */
+        }
+        /* El icono cambia de color al activarse */
+        .card.active-card .play-icon {
+            color: #69f0ae; /* Verde menta o tu color primario */
+            transform: scale(1.2);
+            text-shadow: 0 0 10px rgba(105, 240, 174, 0.5);
+        }
+
+        /* Estado Activo para la Fila de Tabla (Lista) */
+        tr.active-row {
+            background: rgba(100, 181, 246, 0.15) !important;
+        }
+        tr.active-row td {
+            color: #fff;
+        }
+        .btn-table-play.active-btn {
+            border-color: #69f0ae;
+            color: #69f0ae;
+            background: rgba(105, 240, 174, 0.1);
+            box-shadow: 0 0 8px rgba(105, 240, 174, 0.3);
+        }
+
     </style>
 </head>
 
@@ -298,42 +396,14 @@
     <div id="legal-modal" class="modal-overlay">
         <div class="modal-content">
             <button class="close-modal" onclick="cerrarModal()">×</button>
-            
             <h3>Statement of Intent – Documento Fundacional</h3>
-            
             <h4>1. Declaración de propósito</h4>
-            <p>Rokola-IA es un proyecto cultural, tecnológico y de investigación independiente, concebido como un archivo digital de referencia sonora, orientado a la preservación, consulta y contextualización cultural de registros musicales. El proyecto no persigue fines de explotación comercial.</p>
-
+            <p>Rokola-IA es un proyecto cultural, tecnológico y de investigación independiente, concebido como un archivo digital de referencia sonora, orientado a la preservación, consulta y contextualización cultural de registros musicales.</p>
             <h4>2. Naturaleza del proyecto</h4>
             <p>Se define como un archivo digital curado y plataforma experimental. No es una plataforma de consumo masivo ni streaming comercial.</p>
-
-            <h4>3. Alcance funcional y técnico</h4>
-            <ul>
-                <li>Opera como cliente web de consulta.</li>
-                <li>No aloja archivos en servidores propios.</li>
-                <li>La reproducción usa servicios externos oficiales sin descarga.</li>
-            </ul>
-
-            <h4>4. Límites explícitos</h4>
-            <p>Rokola-IA no es una plataforma de distribución musical, ni un medio de monetización. El término "IA" refiere a procesos de catalogación, no a la generación de música.</p>
-
-            <h4>5. Marco ético y legal</h4>
-            <p>Se respetan los derechos de autor. La inclusión responde a criterios de dominio público, autorización, o interés patrimonial/educativo. Existe un canal abierto para retiro de contenidos.</p>
-
-            <h4>6. Carácter del acceso</h4>
-            <p>El acceso es curado, contextual y condicionado a fines de consulta, no de consumo irrestricto.</p>
-
-            <h4>7. Sostenibilidad y Donaciones</h4>
-            <p>Rokola-IA acepta colaboraciones de carácter voluntario destinadas exclusivamente a sostener los gastos tecnológicos de la plataforma y las labores de curaduría. Estas donaciones <strong>no están vinculadas al disfrute de la colección</strong>, ni otorgan privilegios de acceso.</p>
-
-            <h4>8. Proyección futura</h4>
-            <p>Toda evolución mantendrá coherencia con la intención fundacional: privilegiar la preservación sobre el lucro.</p>
-
-            <h4>9. Declaración final</h4>
-            <p>Rokola-IA es un archivo de referencia sonora para la cultura, sin fines de lucro comercial.</p>
-            
-            <br>
-            <p style="text-align: right; font-style: italic; color: var(--primary);">Director de Logos & Contexto</p>
+            <h4>3. Alcance funcional</h4>
+            <ul><li>Opera como cliente web de consulta.</li><li>No aloja archivos en servidores propios.</li></ul>
+            <p style="text-align: right; font-style: italic; color: var(--primary);">Logos & Contexto</p>
         </div>
     </div>
 
@@ -350,9 +420,16 @@
             <div id="now-title" class="player-title">Seleccionando...</div>
             <div id="now-artist" class="player-artist">...</div>
         </div>
+        
         <div class="iframe-container">
+            <div id="player-loader" class="player-loader hidden">
+                <div class="spinner-small"></div>
+            </div>
+            
             <iframe id="gdrive-iframe" class="gdrive-frame" src=""
-                sandbox="allow-scripts allow-same-origin allow-presentation"></iframe>
+                sandbox="allow-scripts allow-same-origin allow-presentation"
+                onload="iframeCargado()"></iframe>
+                
             <div class="blocker">
                 <img src="logos_&_contexto.png" alt="TM" class="blocker-logo" />
             </div>
@@ -367,11 +444,10 @@
         const DEFAULT_IMG = "https://upload.wikimedia.org/wikipedia/commons/b/b6/12in-Vinyl-LP-Record-Angle.jpg";
         const SECRET_KEY = "logoscontexto";
 
-        // --- VARIABLES GLOBALES NUEVAS ---
-        let RESULTADOS_MEMORIA = []; // Almacén temporal de datos
-        let VISTA_ACTUAL = 'grid';   // Estado: 'grid' o 'list'
+        // --- VARIABLES GLOBALES ---
+        let RESULTADOS_MEMORIA = []; // Almacén temporal
+        let VISTA_ACTUAL = 'grid';   // 'grid' o 'list'
 
-        // --- HELPER: Formato de tiempo ---
         function msToTime(duration) {
             if (!duration) return "--:--";
             let seconds = Math.floor((duration / 1000) % 60);
@@ -385,7 +461,7 @@
             if (e.target === this) cerrarModal();
         });
 
-        // SEGURIDAD: DESENCRIPTADO DE TOKENS
+        // --- SEGURIDAD: DESENCRIPTADO ---
         function desofuscar(token) {
             try {
                 const textoCifrado = atob(token);
@@ -397,19 +473,18 @@
                 }
                 const partes = payload.split('|');
                 if (partes.length !== 2) return null;
-                const driveId = partes[0];
                 const expiracion = parseInt(partes[1], 10);
                 const ahora = Math.floor(Date.now() / 1000);
                 if (Number.isNaN(expiracion)) return null;
                 if (ahora > expiracion) return "EXPIRADO";
-                return driveId;
+                return partes[0]; // driveId
             } catch (e) {
                 console.error("Error crypto:", e);
                 return null;
             }
         }
 
-        // --- FUNCIÓN BUSCAR (MODIFICADA CON MEMORIA) ---
+        // --- BUSCADOR ---
         async function buscar() {
             const query = document.getElementById('searchInput').value.trim();
             const loader = document.getElementById('loader');
@@ -422,7 +497,7 @@
             introCard.style.display = 'none';
             loader.style.display = 'block';
             document.getElementById('results').innerHTML = '';
-            controls.style.display = 'none'; // Ocultar mientras carga
+            controls.style.display = 'none';
 
             try {
                 const response = await fetch(`${API_URL}?q=${encodeURIComponent(query)}`);
@@ -434,13 +509,8 @@
                     return;
                 }
 
-                // 1. GUARDAR DATOS EN MEMORIA
                 RESULTADOS_MEMORIA = data;
-                
-                // 2. MOSTRAR CONTROLES
                 controls.style.display = 'flex';
-
-                // 3. DIBUJAR
                 renderizarResultados();
 
             } catch (error) {
@@ -450,25 +520,22 @@
             }
         }
 
-        // --- CAMBIAR VISTA ---
         function cambiarVista(modo) {
             VISTA_ACTUAL = modo;
-            // Toggle visual de botones
             const btns = document.querySelectorAll('.view-btn');
             btns.forEach(b => b.classList.remove('active'));
             if(modo === 'grid') btns[0].classList.add('active');
             else btns[1].classList.add('active');
-
             renderizarResultados();
         }
 
-        // --- RENDERIZADOR MAESTRO (GRILLA O TABLA) ---
+        // --- RENDERIZADOR RESPONSIVO (NUEVO) ---
         function renderizarResultados() {
             const contenedor = document.getElementById('results');
             contenedor.innerHTML = '';
 
             if (VISTA_ACTUAL === 'grid') {
-                // === MODO GALERÍA (CARDS) ===
+                // === VISTA GALERÍA ===
                 contenedor.className = 'grid';
                 contenedor.style.display = 'grid';
 
@@ -476,10 +543,16 @@
                     const img = song.cover_image || DEFAULT_IMG;
                     const safeSong = JSON.stringify(song).replace(/"/g, '&quot;');
                     
+                    const yearTag = song.release_year 
+                        ? `<div style="position:absolute; top:8px; right:8px; background:rgba(0,0,0,0.7); color:#fff; font-size:0.7rem; padding:2px 6px; border-radius:4px; backdrop-filter:blur(4px);">${song.release_year}</div>` 
+                        : '';
+
+                    // AQUÍ ESTABA LA CLAVE: Pasamos 'this' como primer argumento
                     contenedor.innerHTML += `
-                        <div class="card" onclick="reproducir(${safeSong})">
+                        <div class="card" onclick="reproducir(this, ${safeSong})">
                             <div class="cover-container">
                                 <img src="${img}" loading="lazy">
+                                ${yearTag}
                                 <div class="play-overlay"><span class="play-icon">▶</span></div>
                             </div>
                             <div class="info">
@@ -490,7 +563,7 @@
                 });
 
             } else {
-                // === MODO FICHA TÉCNICA (TABLA) ===
+                // === VISTA FICHA TÉCNICA (TABLA MÓVIL) ===
                 contenedor.className = '';
                 contenedor.style.display = 'block';
 
@@ -500,12 +573,26 @@
                         <thead>
                             <tr>
                                 <th style="width:50px">Play</th>
-                                <th>Título</th>
-                                <th>Artista / Identidad</th>
-                                <th>Álbum</th>
-                                <th>Nacionalidad</th>
-                                <th>Género</th>
-                                <th>Duración</th>
+                                
+                                <th style="min-width:180px">
+                                    OBRA
+                                    <span class="th-sub">Título, Artista, Identidad</span>
+                                </th>
+                                
+                                <th style="min-width:140px">
+                                    CONTEXTO
+                                    <span class="th-sub">Álbum, Año, País</span>
+                                </th>
+                                
+                                <th style="min-width:140px">
+                                    EDICIÓN
+                                    <span class="th-sub">Sello, Formato, ID</span>
+                                </th>
+                                
+                                <th style="min-width:120px">
+                                    CLASIFICACIÓN
+                                    <span class="th-sub">Género, Estilo</span>
+                                </th>
                             </tr>
                         </thead>
                         <tbody>
@@ -513,28 +600,42 @@
 
                 RESULTADOS_MEMORIA.forEach(song => {
                     const safeSong = JSON.stringify(song).replace(/"/g, '&quot;');
-                    const duracion = msToTime(song.duration_ms);
                     
-                    // Datos enriquecidos (con fallbacks visuales)
-                    const realName = song.real_name ? `<br><small style="color:#666; font-style:italic;">(${song.real_name})</small>` : '';
-                    const nacion = song.nationality || '<span style="opacity:0.3">-</span>';
-                    const genero = song.genre || '<span style="opacity:0.3">General</span>';
-                    const album = song.album || '<span style="opacity:0.3">Desconocido</span>';
+                    // Manejo de Datos
+                    const realName = song.real_name ? `<span class="col-detail">(${song.real_name})</span>` : '';
+                    const yearBadge = song.release_year ? `<span class="badge badge-year">${song.release_year}</span>` : '';
+                    const country = song.country ? `<span>📍 ${song.country}</span>` : '';
+                    const album = song.album || '<span style="opacity:0.3">Álbum Desconocido</span>';
+                    const label = song.record_label || '<span style="opacity:0.3">--</span>';
+                    const formatBadge = song.original_format ? `<span class="badge badge-format">${song.original_format}</span>` : '';
+                    const genre = song.genre || 'General';
+                    let style = song.style || '';
+                    if(style.length > 30) style = style.substring(0, 30) + '...';
+                    const styleBadge = style ? `<div class="badge badge-style">${style}</div>` : '';
 
+                    // AQUÍ TAMBIÉN: Pasamos 'this'
                     html += `
                         <tr>
                             <td>
-                                <button class="btn-table-play" onclick="reproducir(${safeSong})">▶</button>
+                                <button class="btn-table-play" onclick="reproducir(this, ${safeSong})">▶</button>
                             </td>
-                            <td style="font-weight:600; color:#fff;">${song.clean_title}</td>
                             <td>
-                                ${song.artist}
+                                <span class="col-main-text">${song.clean_title}</span>
+                                <span class="col-sub-text">${song.artist}</span>
                                 ${realName}
                             </td>
-                            <td>${album}</td>
-                            <td>${nacion}</td>
-                            <td>${genero}</td>
-                            <td style="font-family:monospace;">${duracion}</td>
+                            <td>
+                                <div style="margin-bottom:4px;">${album}</div>
+                                <div>${yearBadge} ${country}</div>
+                            </td>
+                            <td>
+                                <span class="col-main-text" style="font-size:0.85rem;">${label}</span>
+                                ${formatBadge}
+                            </td>
+                            <td>
+                                <span class="col-sub-text">${genre}</span>
+                                ${styleBadge}
+                            </td>
                         </tr>
                     `;
                 });
@@ -544,7 +645,39 @@
             }
         }
 
-        function reproducir(song) {
+        // --- FUNCIÓN REPRODUCIR CORREGIDA (RECIBE 2 ARGUMENTOS) ---
+        function reproducir(elementoUI, song) {
+            // 1. GESTIÓN VISUAL (UX: CAMBIO A CHECK)
+            
+            // A. Limpiar selección anterior (Resetea todo a Play ▶)
+            document.querySelectorAll('.card').forEach(c => {
+                c.classList.remove('active-card');
+                const icon = c.querySelector('.play-icon');
+                if(icon) icon.innerText = '▶'; 
+            });
+            document.querySelectorAll('tr').forEach(row => row.classList.remove('active-row'));
+            document.querySelectorAll('.btn-table-play').forEach(btn => {
+                btn.classList.remove('active-btn');
+                btn.innerText = '▶';
+            });
+
+            // B. Activar el elemento clickeado (Cambia a Check ✔)
+            if (elementoUI) {
+                if (elementoUI.classList.contains('card')) {
+                    // Es una tarjeta (Grid)
+                    elementoUI.classList.add('active-card');
+                    const icon = elementoUI.querySelector('.play-icon');
+                    if(icon) icon.innerText = '✔'; 
+                } else if (elementoUI.classList.contains('btn-table-play')) {
+                    // Es un botón de tabla
+                    elementoUI.classList.add('active-btn');
+                    elementoUI.innerText = '✔';
+                    const fila = elementoUI.closest('tr');
+                    if(fila) fila.classList.add('active-row');
+                }
+            }
+
+            // 2. LÓGICA DEL REPRODUCTOR (CARGA SHIBUI)
             document.getElementById('now-title').innerText = song.clean_title || "Sin título";
             document.getElementById('now-artist').innerText = song.artist || "...";
 
@@ -554,27 +687,35 @@
                 if (resultado === "EXPIRADO") {
                     alert("⏳ La sesión caducó. Busca de nuevo.");
                     return;
-                } else if (resultado) {
-                    driveId = resultado;
-                }
+                } else if (resultado) driveId = resultado;
             }
-            if (!driveId) driveId = extraerDriveId(song.drive_file_id || song.web_view_link);
+            if (!driveId && song.drive_file_id) driveId = song.drive_file_id; 
+            
             if (!driveId) return console.error("ID inválido");
 
             const embedUrl = `https://drive.google.com/file/d/${driveId}/preview`;
-            document.getElementById('gdrive-iframe').src = embedUrl;
-            document.getElementById('embedded-player').classList.add('active');
+            const iframe = document.getElementById('gdrive-iframe');
+            
+            // Mostrar Loader y Player
+            document.getElementById('player-loader').classList.remove('hidden'); 
+            document.getElementById('embedded-player').classList.add('active');  
+
+            // Cargar URL
+            iframe.src = "about:blank"; 
+            setTimeout(() => { iframe.src = embedUrl; }, 10);
+        }
+
+        // Se ejecuta cuando Google Drive termina de cargar
+        function iframeCargado() {
+            document.getElementById('player-loader').classList.add('hidden');
         }
 
         function cerrarReproductor() {
             document.getElementById('embedded-player').classList.remove('active');
-            setTimeout(() => { document.getElementById('gdrive-iframe').src = ""; }, 500);
-        }
-
-        function extraerDriveId(urlOrId) {
-            if (!urlOrId) return "";
-            const match = urlOrId.match(/\/d\/(.+?)\/|id=(.+?)&|id=(.+?)$|^([a-zA-Z0-9_-]{25,})$/);
-            return match ? (match[1] || match[2] || match[3] || match[4]) : "";
+            setTimeout(() => { 
+                document.getElementById('gdrive-iframe').src = ""; 
+                document.getElementById('player-loader').classList.remove('hidden');
+            }, 500);
         }
 
         document.getElementById('searchInput').addEventListener('keypress', (e) => {

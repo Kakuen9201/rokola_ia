@@ -1,17 +1,16 @@
 """
 =============================================================================
  PROYECTO: ROKOLA IA - SISTEMA DE GESTIÓN DE ARCHIVOS SONOROS (DAM)
- SCRIPT:   MIGRACIÓN Y SINCRONIZACIÓN DE METADATOS (Postgres -> AWS DynamoDB)
+ SCRIPT:   MIGRACIÓN MAESTRA V2 (Postgres -> AWS DynamoDB)
  
  DESCRIPCIÓN:
- Este script actúa como puente ETL (Extract, Transform, Load). 
- Extrae la información enriquecida y curada desde la base de datos maestra 
- (PostgreSQL en Frailes), incluyendo IDENTIDAD REAL y GEOGRAFÍA HUMANA,
- aplica normalización de datos y sincroniza el catálogo con la nube.
+ Script ETL completo. Sincroniza:
+ 1. Metadatos básicos (Título, Artista).
+ 2. Identidad Real y Geografía Humana (LastFM).
+ 3. Datos de Edición y Coleccionismo (Discogs: Año, Sello, Estilo).
  
  AUTOR:    Rommel Contreras
- CARGO:    Director de Logos & Contexto
- FECHA:    Enero 2026
+ FECHA:    Febrero 2026
 =============================================================================
 """
 
@@ -19,7 +18,6 @@ import psycopg2
 import boto3
 import os
 from dotenv import load_dotenv
-import time
 from decimal import Decimal
 
 # Cargar variables de entorno
@@ -58,13 +56,10 @@ def migrar():
     table = dynamodb.Table('MusicaStartup')
     
     cur = pg_conn.cursor()
-    print("\n🚀 INICIANDO PROTOCOLO DE MIGRACIÓN: ROKOLA IA")
-    print("   Autor: Rommel Contreras")
-    print("   -------------------------------------------")
-    print("   Leyendo catálogo maestro enriquecido (Identidad + Geografía)...")
+    print("\n🚀 INICIANDO MIGRACIÓN MAESTRA V2: ROKOLA IA")
+    print("   Integrando datos de LastFM + Discogs...")
     
-    # 2. QUERY MAESTRA ACTUALIZADA
-    # Incluye 'real_name'
+    # 2. QUERY MAESTRA V2 (INCLUYE DATOS DISCOGS)
     sql = """
         SELECT 
             id, 
@@ -81,9 +76,18 @@ def migrar():
             curator,
             lastfm_mbid,
             nationality,
-            real_name
+            real_name,
+            -- 👇 NUEVOS CAMPOS (DISCOGS) 👇
+            release_year,
+            country,
+            style,
+            record_label,
+            original_format,
+            discogs_id
         FROM musica_startup
-        WHERE lastfm_processed = TRUE
+        -- Quitamos el filtro estricto para que suba todo lo disponible
+        -- (Incluso si solo tiene datos básicos)
+        WHERE drive_file_id IS NOT NULL 
     """
     
     cur.execute(sql)
@@ -97,30 +101,38 @@ def migrar():
     with table.batch_writer() as batch:
         count = 0
         for row in rows:
-            # Desempaquetado seguro
+            # Desempaquetado seguro (21 columnas)
             (db_id, drive_id, title, artist, album, genre, 
-             duration, cover, link, summary, origin, curator, mbid, nationality, real_name) = row
+             duration, cover, link, summary, origin, curator, mbid, 
+             nationality, real_name, 
+             release_year, d_country, style, label, fmt, d_id) = row
 
-            # --- LIMPIEZA Y VALIDACIÓN ---
+            # --- LIMPIEZA Y VALIDACIÓN BÁSICA ---
             safe_title = title if title else "Desconocido"
             safe_artist = artist if artist else "Varios"
             safe_album = album if album else ""
+            
+            # --- DATOS HUMANOS (LastFM) ---
             safe_nationality = nationality if nationality else ""
             safe_real_name = real_name if real_name else ""
             
-            # --- GENERACIÓN DE PALABRAS CLAVE (SEO PROFUNDO) ---
-            # Ahora la búsqueda encuentra: "Alberto Aguilera" -> Juan Gabriel
-            keywords = f"{safe_title} {safe_artist} {safe_album} {safe_nationality} {safe_real_name}".lower()
+            # --- DATOS DISCOGS ---
+            safe_year = int(release_year) if release_year else None
+            safe_d_country = d_country if d_country else ""
+            safe_style = style if style else ""
+            safe_label = label if label else ""
+            safe_format = fmt if fmt else ""
+            safe_d_id = int(d_id) if d_id else None
+
+            # --- GENERACIÓN DE PALABRAS CLAVE (SEO PROFUNDO V2) ---
+            # Ahora incluye Año, Estilo y País de edición
+            year_str = str(safe_year) if safe_year else ""
+            keywords = f"{safe_title} {safe_artist} {safe_album} {safe_nationality} {safe_real_name} {year_str} {safe_style} {safe_d_country}".lower()
             
-            # Manejo de tipos para DynamoDB
+            # Manejo de tipos DynamoDB
             safe_duration = int(duration) if duration else 0
             safe_summary = summary if summary else "Sin descripción disponible."
-            safe_origin = origin if origin else "Desconocido"
-            safe_curator = curator if curator else "Sistema"
-            safe_mbid = mbid if mbid else "N/A"
-            safe_nat_display = nationality if nationality else "No especificada"
-            safe_real_display = real_name if real_name else safe_artist # Si no hay nombre real, usa el artístico
-
+            
             # --- CONSTRUCCIÓN DEL OBJETO DIGITAL ---
             item = {
                 'id': str(db_id),
@@ -132,15 +144,26 @@ def migrar():
                 'duration_ms': safe_duration,
                 'cover_image': cover if cover else "",
                 'web_view_link': link,
-                'search_keywords': keywords,     # Motor de búsqueda (ahora con identidad real)
-                'music_summary': safe_summary,   # Contexto cultural
-                'origin': safe_origin,           # Fuente del archivo
-                'curator': safe_curator,         # Responsable
-                'lastfm_mbid': safe_mbid,        # ID Universal
-                'nationality': safe_nat_display, # Geografía Humana
-                'real_name': safe_real_display   # Identidad Real
+                'search_keywords': keywords,
+                'music_summary': safe_summary,
+                
+                # Datos Identidad
+                'nationality': safe_nationality if safe_nationality else "No especificada",
+                'real_name': safe_real_name if safe_real_name else safe_artist,
+                
+                # Datos Discogs (Nuevos)
+                'release_year': safe_year,
+                'country': safe_d_country,   # País de edición (Físico)
+                'style': safe_style,         # Subgénero
+                'record_label': safe_label,
+                'original_format': safe_format,
+                'discogs_id': safe_d_id
             }
             
+            # Limpiamos claves con valor None (DynamoDB no le gusta null en algunos casos)
+            # o dejamos que batch_writer maneje. Lo mejor es quitar keys vacías opcionales.
+            item = {k: v for k, v in item.items() if v is not None and v != ""}
+
             # Subida
             batch.put_item(Item=item)
             
@@ -153,9 +176,9 @@ def migrar():
     pg_conn.close()
     
     print("-" * 50)
-    print(f"✅ SINCRONIZACIÓN EXITOSA.")
-    print(f"   Total actualizado: {count} obras culturales.")
-    print("   Metadatos de Identidad y Geografía incorporados.")
+    print(f"✅ SINCRONIZACIÓN MAESTRA EXITOSA.")
+    print(f"   Total actualizado: {count} obras.")
+    print("   Ahora tu Rokola sabe de Años, Sellos y Estilos.")
 
 if __name__ == "__main__":
     migrar()

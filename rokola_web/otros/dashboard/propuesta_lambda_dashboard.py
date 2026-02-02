@@ -1,0 +1,122 @@
+import json
+import boto3
+import time
+import uuid
+from boto3.dynamodb.conditions import Key, Attr
+from decimal import Decimal
+
+# --- CONFIGURACIÓN --- el espía
+SECRET_KEY = "logoscontexto"
+TABLE_MUSIC = "MusicaStartup"
+TABLE_STATS = "RokolaActivity"
+ADMIN_PASSWORD = "rommel_master_key" # 🔒 CAMBIA ESTO PARA ENTRAR A TU DASHBOARD
+
+dynamodb = boto3.resource('dynamodb')
+table_music = dynamodb.Table(TABLE_MUSIC)
+table_stats = dynamodb.Table(TABLE_STATS)
+
+# --- CLASES AUXILIARES ---
+class DecimalEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, Decimal):
+            return int(obj) if obj % 1 == 0 else float(obj)
+        return super(DecimalEncoder, self).default(obj)
+
+def response(code, body):
+    return {
+        'statusCode': code,
+        'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+        'body': json.dumps(body, cls=DecimalEncoder)
+    }
+
+# --- FUNCIÓN DE LOGGING (EL ESPÍA) ---
+def registrar_actividad(accion, detalle):
+    try:
+        ahora = int(time.time())
+        # TTL: Borrar log automáticamente en 7 días (7*24*60*60 = 604800 seg)
+        expira = ahora + 604800 
+        
+        table_stats.put_item(Item={
+            'pk': 'LOG',
+            'timestamp': ahora,
+            'log_id': str(uuid.uuid4()),
+            'action': accion,
+            'details': detalle,
+            'expiracion': expira
+        })
+    except Exception as e:
+        print(f"⚠️ Error guardando log: {e}") # No romper la app si falla el log
+
+# --- FUNCIÓN DE ESTADÍSTICAS (EL DASHBOARD) ---
+def obtener_estadisticas():
+    ahora = int(time.time())
+    hace_5_min = ahora - 300
+    hace_24_horas = ahora - 86400
+    
+    try:
+        # Traer actividad de las últimas 24 horas
+        resp = table_stats.query(
+            KeyConditionExpression=Key('pk').eq('LOG') & Key('timestamp').gt(hace_24_horas)
+        )
+        items = resp.get('Items', [])
+        
+        # 1. Usuarios "Activos" (Últimos 5 min)
+        # Como no tenemos logins, usamos aproximación por volumen reciente
+        activos_recientes = [i for i in items if i['timestamp'] > hace_5_min]
+        usuarios_online = len(activos_recientes) # Aproximación simple
+        
+        # 2. Actividad por Hora (Para la gráfica)
+        # Agrupar logs por hora
+        timeline = {}
+        for i in items:
+            # Convertir timestamp a hora legible (Ej: "14:00")
+            hora_struct = time.localtime(int(i['timestamp']))
+            etiqueta = f"{hora_struct.tm_hour}:00"
+            timeline[etiqueta] = timeline.get(etiqueta, 0) + 1
+            
+        # 3. Top Búsquedas (Simple)
+        busquedas = [i['details'] for i in items if i['action'] == 'SEARCH']
+        top_terms = {}
+        for b in busquedas:
+            top_terms[b] = top_terms.get(b, 0) + 1
+        
+        # Ordenar top 5
+        top_5 = sorted(top_terms.items(), key=lambda x: x[1], reverse=True)[:5]
+
+        return {
+            'online_now': usuarios_online,
+            'total_24h': len(items),
+            'timeline': timeline,
+            'top_search': top_5
+        }
+    except Exception as e:
+        return {'error': str(e)}
+
+# --- HANDLER PRINCIPAL ---
+def lambda_handler(event, context):
+    params = event.get('queryStringParameters') or {}
+
+    # === MODO DASHBOARD (ADMIN) ===
+    if params.get('mode') == 'stats':
+        if params.get('key') != ADMIN_PASSWORD:
+            return response(403, {'error': 'Acceso Denegado'})
+        stats = obtener_estadisticas()
+        return response(200, stats)
+
+    # === MODO NORMAL (ROKOLA) ===
+    # Lógica original de búsqueda (resumida para el ejemplo)
+    if 'q' in params:
+        query = params['q'].lower()
+        
+        # 📢 REGISTRAR ACTIVIDAD
+        registrar_actividad('SEARCH', query)
+        
+        # ... (AQUÍ VA TU LÓGICA DE BÚSQUEDA EXISTENTE SCAN/QUERY) ...
+        # (Asegúrate de mantener tu lógica de búsqueda original aquí abajo)
+        # Para simplificar el ejemplo, asumo que pegas tu lógica de búsqueda aquí.
+        # Solo asegúrate de llamar a registrar_actividad() antes de buscar.
+        
+        # Simulación de respuesta para que el código compile:
+        return response(200, []) 
+        
+    return response(400, {'error': 'Faltan parámetros'})
