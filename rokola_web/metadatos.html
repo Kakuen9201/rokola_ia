@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>Rokola IA - Logos & Contexto</title>
+    <title>Rokola IA - Metadatos</title>
     <link rel="icon" type="image/png" href="logos_&_contexto.png" />
 
     <link rel="preconnect" href="https://drive.google.com" crossorigin>
@@ -268,12 +268,30 @@
         .iframe-container { flex: 1; position: relative; height: 40px; border-radius: 4px; }
         iframe.gdrive-frame { width: 100%; height: 100%; border: none; background: transparent; }
         
-        .blocker {
-            position: absolute; top: 0; right: 0; bottom: 0; width: 90px;
-            background-color: #181818; z-index: 10; pointer-events: auto;
-            display: flex; align-items: center; justify-content: center; border-left: 1px solid #222;
+        /* 🆕 LOGO TAPITA (CORREGIDO SEGÚN TU SOLICITUD) */
+        .player-logo-overlay {
+            position: absolute;
+            top: 0;
+            right: 0;
+            height: 100%;
+            
+            /* Dimensiones */
+            width: 5%; 
+            min-width: 100px;
+            
+            /* FONDO: #151515 */
+            background: #151515; 
+            
+            /* AJUSTE DE IMAGEN */
+            object-fit: contain;      
+            object-position: left center; /* Corregido 'lesft' -> 'left' */
+            
+            padding: 8px 15px; 
+            opacity: 1;
+            z-index: 10;
+            border-top-right-radius: 4px;
         }
-        .blocker-logo { width: 45px; height: auto; filter: invert(1) contrast(150%); mix-blend-mode: screen; opacity: 0.8; }
+
         .close-player { background: none; border: none; color: #666; font-size: 1.5rem; cursor: pointer; padding: 0 10px; z-index: 2; }
         .close-player:hover { color: var(--text); }
         
@@ -430,9 +448,7 @@
                 sandbox="allow-scripts allow-same-origin allow-presentation"
                 onload="iframeCargado()"></iframe>
                 
-            <div class="blocker">
-                <img src="logos_&_contexto.png" alt="TM" class="blocker-logo" />
-            </div>
+            <img src="logos_&_contexto.png" alt="TM" class="player-logo-overlay" />
         </div>
         <button class="close-player" onclick="cerrarReproductor()">×</button>
     </div>
@@ -547,7 +563,6 @@
                         ? `<div style="position:absolute; top:8px; right:8px; background:rgba(0,0,0,0.7); color:#fff; font-size:0.7rem; padding:2px 6px; border-radius:4px; backdrop-filter:blur(4px);">${song.release_year}</div>` 
                         : '';
 
-                    // AQUÍ ESTABA LA CLAVE: Pasamos 'this' como primer argumento
                     contenedor.innerHTML += `
                         <div class="card" onclick="reproducir(this, ${safeSong})">
                             <div class="cover-container">
@@ -573,26 +588,10 @@
                         <thead>
                             <tr>
                                 <th style="width:50px">Play</th>
-                                
-                                <th style="min-width:180px">
-                                    OBRA
-                                    <span class="th-sub">Título, Artista, Identidad</span>
-                                </th>
-                                
-                                <th style="min-width:140px">
-                                    CONTEXTO
-                                    <span class="th-sub">Álbum, Año, País</span>
-                                </th>
-                                
-                                <th style="min-width:140px">
-                                    EDICIÓN
-                                    <span class="th-sub">Sello, Formato, ID</span>
-                                </th>
-                                
-                                <th style="min-width:120px">
-                                    CLASIFICACIÓN
-                                    <span class="th-sub">Género, Estilo</span>
-                                </th>
+                                <th style="min-width:180px">OBRA <span class="th-sub">Título, Artista, Identidad</span></th>
+                                <th style="min-width:140px">CONTEXTO <span class="th-sub">Álbum, Año, País</span></th>
+                                <th style="min-width:140px">EDICIÓN <span class="th-sub">Sello, Formato, ID</span></th>
+                                <th style="min-width:120px">CLASIFICACIÓN <span class="th-sub">Género, Estilo</span></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -613,7 +612,6 @@
                     if(style.length > 30) style = style.substring(0, 30) + '...';
                     const styleBadge = style ? `<div class="badge badge-style">${style}</div>` : '';
 
-                    // AQUÍ TAMBIÉN: Pasamos 'this'
                     html += `
                         <tr>
                             <td>
@@ -645,11 +643,11 @@
             }
         }
 
-        // --- FUNCIÓN REPRODUCIR CORREGIDA (RECIBE 2 ARGUMENTOS) ---
+        // --- FUNCIÓN REPRODUCIR CORREGIDA ---
         function reproducir(elementoUI, song) {
             // 1. GESTIÓN VISUAL (UX: CAMBIO A CHECK)
             
-            // A. Limpiar selección anterior (Resetea todo a Play ▶)
+            // A. Limpiar selección anterior
             document.querySelectorAll('.card').forEach(c => {
                 c.classList.remove('active-card');
                 const icon = c.querySelector('.play-icon');
@@ -661,15 +659,13 @@
                 btn.innerText = '▶';
             });
 
-            // B. Activar el elemento clickeado (Cambia a Check ✔)
+            // B. Activar el elemento clickeado
             if (elementoUI) {
                 if (elementoUI.classList.contains('card')) {
-                    // Es una tarjeta (Grid)
                     elementoUI.classList.add('active-card');
                     const icon = elementoUI.querySelector('.play-icon');
                     if(icon) icon.innerText = '✔'; 
                 } else if (elementoUI.classList.contains('btn-table-play')) {
-                    // Es un botón de tabla
                     elementoUI.classList.add('active-btn');
                     elementoUI.innerText = '✔';
                     const fila = elementoUI.closest('tr');
@@ -677,7 +673,7 @@
                 }
             }
 
-            // 2. LÓGICA DEL REPRODUCTOR (CARGA SHIBUI)
+            // 2. LÓGICA DEL REPRODUCTOR
             document.getElementById('now-title').innerText = song.clean_title || "Sin título";
             document.getElementById('now-artist').innerText = song.artist || "...";
 
@@ -696,11 +692,9 @@
             const embedUrl = `https://drive.google.com/file/d/${driveId}/preview`;
             const iframe = document.getElementById('gdrive-iframe');
             
-            // Mostrar Loader y Player
             document.getElementById('player-loader').classList.remove('hidden'); 
             document.getElementById('embedded-player').classList.add('active');  
 
-            // Cargar URL
             iframe.src = "about:blank"; 
             setTimeout(() => { iframe.src = embedUrl; }, 10);
         }
