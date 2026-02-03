@@ -388,37 +388,53 @@
 
         // --- BUSCADOR ---
         async function buscar() {
-            const query = document.getElementById('searchInput').value.trim();
-            const loader = document.getElementById('loader');
+            const input = document.getElementById('searchInput');
             const introCard = document.getElementById('intro-card');
+            const loader = document.getElementById('loader');
             const resultsContainer = document.getElementById('results');
+
+            // 1. Obtener el valor limpio
+            let query = input.value.trim();
 
             if (!query || query.length < 3) return alert("Ingresa al menos 3 caracteres.");
 
+            // 🔧 CORRECCIÓN INTELIGENTE: "Formato Título"
+            // Convierte "piero" -> "Piero" y "juan gabriel" -> "Juan Gabriel"
+            // Esto es vital para que coincida con la base de datos de AWS
+            query = query.toLowerCase().replace(/(^\w{1})|(\s+\w{1})/g, letter => letter.toUpperCase());
+            
+            console.log("🔍 Enviando a Lambda:", query); // Para depurar
+
+            // Ocultar intro y mostrar loader
             introCard.style.display = 'none';
             loader.style.display = 'block';
             resultsContainer.innerHTML = '';
 
             try {
+                // Enviamos la query ya corregida (con mayúsculas)
                 const response = await fetch(`${API_URL}?q=${encodeURIComponent(query)}`);
                 const data = await response.json();
+                
                 loader.style.display = 'none';
 
                 if (!Array.isArray(data) || data.length === 0) {
-                    resultsContainer.innerHTML = '<p style="text-align:center;color:#666;">No se encontraron resultados.</p>';
-                    introCard.style.display = 'block'; 
+                    resultsContainer.innerHTML = '<p style="text-align:center;color:#666;">No se encontraron resultados (Verifica acentos).</p>';
+                    // Opcional: Si no encuentras nada, podrías volver a mostrar el intro o dejar el mensaje
+                    // introCard.style.display = 'block'; 
                     return;
                 }
 
+                // Generar tarjetas (Misma lógica tuya original)
                 data.forEach(song => {
                     const img = song.cover_image || DEFAULT_IMG;
+                    // Escapar comillas para evitar errores en el HTML
                     const safeSong = JSON.stringify(song).replace(/"/g, '&quot;');
                     
                     const yearTag = song.release_year 
                         ? `<div style="position:absolute; top:8px; right:8px; background:rgba(0,0,0,0.7); color:#fff; font-size:0.7rem; padding:2px 6px; border-radius:4px;">${song.release_year}</div>` 
                         : '';
 
-                    // Se pasa 'this' en el onclick
+                    // Inyectar HTML manteniendo tu diseño exacto
                     resultsContainer.innerHTML += `
                         <div class="card" onclick="reproducir(this, ${safeSong})">
                             <div class="cover-container">
@@ -429,6 +445,7 @@
                             <div class="info">
                                 <div class="title">${song.clean_title}</div>
                                 <div class="artist">${song.artist}</div>
+                                ${song.real_name ? `<div style="font-size:0.7em; color:#64b5f6; margin-top:2px;">ℹ️ ${song.real_name}</div>` : ''}
                             </div>
                         </div>`;
                 });
@@ -436,7 +453,7 @@
             } catch (error) {
                 loader.style.display = 'none';
                 console.error("Error:", error);
-                alert("Error de conexión.");
+                alert("Error de conexión con el servidor.");
                 introCard.style.display = 'block';
             }
         }
