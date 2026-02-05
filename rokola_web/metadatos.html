@@ -502,13 +502,22 @@
 
         // --- BUSCADOR ---
         async function buscar() {
-            const query = document.getElementById('searchInput').value.trim();
+            const inputElement = document.getElementById('searchInput'); // Usar variable para claridad
             const loader = document.getElementById('loader');
             const introCard = document.getElementById('intro-card');
             const controls = document.getElementById('viewControls');
+            
+            // 1. Obtener valor y limpiar espacios
+            let query = inputElement.value.trim();
 
             if (!query) return;
             if (query.length < 3) return alert("Mínimo 3 caracteres");
+
+            // 🆕 2. LA MAGIA: Convertir a "Formato Título" (Igual que en index.html)
+            // "piero" -> "Piero", "juan gabriel" -> "Juan Gabriel"
+            query = query.toLowerCase().replace(/(^\w{1})|(\s+\w{1})/g, letter => letter.toUpperCase());
+
+            console.log("🔍 Buscando en Metadatos:", query); // Para depurar
 
             introCard.style.display = 'none';
             loader.style.display = 'block';
@@ -521,7 +530,7 @@
                 loader.style.display = 'none';
 
                 if (!Array.isArray(data) || data.length === 0) {
-                    document.getElementById('results').innerHTML = '<p style="text-align:center;color:#666;margin-top:20px;">Sin resultados.</p>';
+                    document.getElementById('results').innerHTML = '<p style="text-align:center;color:#666;margin-top:20px;">Sin resultados (Intenta verificar acentos).</p>';
                     return;
                 }
 
@@ -535,6 +544,7 @@
                 document.getElementById('results').innerHTML = '<p style="color:#ef5350; text-align:center; width:100%; margin-top:20px;">Error de conexión.</p>';
             }
         }
+
 
         function cambiarVista(modo) {
             VISTA_ACTUAL = modo;
