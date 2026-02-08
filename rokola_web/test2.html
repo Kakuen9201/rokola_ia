@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="referrer" content="no-referrer">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rokola IA - Híbrida</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #1a1a1a; color: #fff; text-align: center; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; }
+        
+        /* Buscador */
+        input[type="text"] { padding: 10px; width: 70%; border-radius: 5px; border: none; font-size: 16px; }
+        button { padding: 10px 20px; background: #00ff88; border: none; cursor: pointer; border-radius: 5px; font-weight: bold; font-size: 16px; }
+        
+        /* Lista */
+        #playlist-ui { list-style: none; padding: 0; margin-top: 20px; text-align: left; max-height: 400px; overflow-y: auto; }
+        .song-item { 
+            background: #333; padding: 12px; margin-bottom: 5px; cursor: pointer; border-radius: 5px; 
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .song-item:hover { background: #444; transform: translateX(5px); transition: 0.2s; }
+        .active-song { background: #00ff88 !important; color: #000 !important; font-weight: bold; }
+        .song-info { display: flex; flex-direction: column; }
+        .song-artist { font-size: 0.85em; color: #aaa; }
+        .active-song .song-artist { color: #333; }
+
+        /* Reproductor */
+        .player-box { margin-top: 30px; background: #222; padding: 20px; border-radius: 10px; border: 1px solid #333; }
+        audio { width: 100%; margin-top: 15px; }
+        #current-status { color: #aaa; font-size: 0.9em; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🎸 Rokola IA <span style="font-size:0.5em; color:#00ff88">HÍBRIDA</span></h1>
+    
+    <div>
+        <input type="text" id="search-box" placeholder="Ej: Shakira, Piero..." onkeypress="handleEnter(event)">
+        <button onclick="buscarCanciones()">Buscar</button>
+    </div>
+
+    <div class="player-box">
+        <h3 id="player-title">Selecciona una canción</h3>
+        <h4 id="player-artist" style="color: #888;">...</h4>
+        <audio id="audio-player" controls crossorigin="anonymous"></audio>
+        <p id="current-status">Esperando...</p>
+    </div>
+
+    <ul id="playlist-ui"></ul>
+</div>
+
+<script>
+    // --- CONFIGURACIÓN DE APIS ---
+    // API 1: Buscador (Tu API original que exige ?q=...)
+    const SEARCH_API_URL = "https://0pxruxinnc.execute-api.us-east-1.amazonaws.com/canciones"; 
+    
+    // API 2: Streamer (Tu nueva Lambda optimizada anti-bloqueo)
+    const STREAM_API_URL = "https://t6579gofe1.execute-api.us-east-1.amazonaws.com/default/RokolaStreamer";
+
+    // Variables de Estado
+    let currentPlaylist = []; 
+    let currentIndex = -1;
+    
+    const audioPlayer = document.getElementById('audio-player');
+    const statusLabel = document.getElementById('current-status');
+    const listUi = document.getElementById('playlist-ui');
+
+    function handleEnter(e) {
+        if(e.key === 'Enter') buscarCanciones();
+    }
+
+    // --- 1. BUSCAR (Corregido para enviar ?q=) ---
+    function buscarCanciones() {
+        const query = document.getElementById('search-box').value;
+        
+        // Validación: Tu API antigua exige que 'q' no esté vacío
+        if (!query) {
+            statusLabel.innerText = "⚠️ Escribe algo para buscar.";
+            return;
+        }
+
+        statusLabel.innerText = "Consultando catálogo...";
+        listUi.innerHTML = "";
+
+        // CORRECCIÓN AQUÍ: Agregamos ?q= al final de la URL
+        fetch(`${SEARCH_API_URL}?q=${query}`) 
+            .then(res => res.json())
+            .then(data => {
+                // Adaptador de respuesta:
+                // A veces las APIs devuelven {body: [...]}, a veces directo [...]
+                let resultados = [];
+                
+                if (Array.isArray(data)) {
+                    resultados = data;
+                } else if (data.body) {
+                    // Si viene como string JSON dentro de body
+                    resultados = typeof data.body === 'string' ? JSON.parse(data.body) : data.body;
+                } else if (data.results) {
+                    resultados = data.results;
+                }
+
+                currentPlaylist = resultados || [];
+
+                if (currentPlaylist.length === 0) {
+                    statusLabel.innerText = "No se encontraron coincidencias.";
+                    return;
+                }
+
+                renderPlaylist();
+                statusLabel.innerText = `✅ Se encontraron ${currentPlaylist.length} canciones.`;
+                statusLabel.style.color = "#00ff88";
+            })
+            .catch(err => {
+                console.error(err);
+                statusLabel.innerText = "❌ Error al buscar (Revisa consola)";
+                statusLabel.style.color = "red";
+            });
+    }
+
+    // --- 2. RENDERIZAR LISTA ---
+    function renderPlaylist() {
+        listUi.innerHTML = ""; 
+        currentPlaylist.forEach((song, index) => {
+            const li = document.createElement('li');
+            li.className = "song-item";
+            
+            // Protección: A veces viene 'clean_title', a veces 'title'
+            const titulo = song.clean_title || song.title || "Sin Título";
+            const artista = song.artist || "Desconocido";
+            const idCancion = song.id;
+
+            li.innerHTML = `
+                <div class="song-info">
+                    <span>${titulo}</span>
+                    <span class="song-artist">${artista}</span>
+                </div>
+                <span style="font-size: 0.8em; color: #666">ID: ${idCancion}</span>
+            `;
+            
+            li.onclick = () => playSong(index);
+            if (index === currentIndex) li.classList.add("active-song");
+            listUi.appendChild(li);
+        });
+    }
+
+    // --- 3. REPRODUCIR (Usa la Lambda Nueva) ---
+    function playSong(index) {
+        if (index >= currentPlaylist.length) return;
+
+        currentIndex = index;
+        const song = currentPlaylist[index];
+        const titulo = song.clean_title || song.title || "Canción";
+
+        // UI Update
+        document.getElementById('player-title').innerText = titulo;
+        document.getElementById('player-artist').innerText = song.artist || "";
+        renderPlaylist();
+
+        statusLabel.innerText = "⏳ Obteniendo enlace seguro...";
+        statusLabel.style.color = "yellow";
+
+        // Llamamos a la API NUEVA solo para obtener el link seguro
+        fetch(`${STREAM_API_URL}?id=${song.id}`)
+            .then(res => res.json())
+            .then(data => {
+                if(data.stream_url) {
+                    audioPlayer.src = data.stream_url;
+                    audioPlayer.play().catch(e => console.warn("Autoplay bloqueado por navegador"));
+                    statusLabel.innerText = "🎵 Reproduciendo";
+                    statusLabel.style.color = "#00ff88";
+                } else {
+                    throw new Error(data.error || "No se recibió URL de audio");
+                }
+            })
+            .catch(err => {
+                statusLabel.innerText = "❌ Error: " + err.message;
+                console.error(err);
+            });
+    }
+
+    // Auto-Play Siguiente
+    audioPlayer.addEventListener('ended', () => {
+        if (currentIndex < currentPlaylist.length - 1) {
+            playSong(currentIndex + 1);
+        }
+    });
+</script>
+
+</body>
+</html>
