@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="no-referrer">
+    <title>Rokola - Test de Streaming</title>
+    <style>
+        body { background: #121212; color: white; font-family: sans-serif; padding: 20px; }
+        .card { background: #1e1e1e; padding: 10px; margin: 5px 0; cursor: pointer; border: 1px solid #333; display: flex; justify-content: space-between; }
+        .card:hover { border-color: #64b5f6; }
+        .active { border-color: #00e676; background: #252525; }
+        #player-box { position: sticky; top: 0; background: #000; padding: 20px; border-bottom: 2px solid #333; margin-bottom: 20px; }
+        audio { width: 100%; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+    <div id="player-box">
+        <h2 id="now-playing">Selecciona una canción</h2>
+        <audio id="audio-player" controls autoplay crossorigin="anonymous"></audio>
+        <div id="status" style="color:#888; font-size: 0.8em; margin-top:5px;">Esperando...</div>
+    </div>
+
+    <input type="text" id="search" placeholder="Buscar artista..." style="padding: 10px; width: 80%;">
+    <button onclick="buscar()">Buscar</button>
+
+    <div id="results"></div>
+
+    <script>
+        // CONFIGURACIÓN
+        const SEARCH_API_URL = "https://0pxruxinnc.execute-api.us-east-1.amazonaws.com/canciones"; // La que ya tienes
+        const STREAM_API_URL = "https://t6579gofe1.execute-api.us-east-1.amazonaws.com/default/RokolaStreamer"; // La nueva
+
+        let playlist = []; // Aquí guardaremos los resultados para poder avanzar
+        let currentIndex = -1;
+        const player = document.getElementById('audio-player');
+        const status = document.getElementById('status');
+
+        // 1. BUSCAR (Usa tu sistema viejo)
+        async function buscar() {
+            const query = document.getElementById('search').value;
+            const res = await fetch(`${SEARCH_API_URL}?q=${encodeURIComponent(query)}`);
+            const data = await res.json();
+            
+            playlist = data; // Guardamos resultados en memoria
+            renderList();
+        }
+
+        function renderList() {
+            const container = document.getElementById('results');
+            container.innerHTML = '';
+            playlist.forEach((song, index) => {
+                // Usamos el ID de DynamoDB (song.id), ignoramos el token ofuscado viejo
+                container.innerHTML += `
+                    <div class="card" onclick="pedirStream(${index})">
+                        <span>${song.clean_title}</span>
+                        <small>${song.artist}</small>
+                    </div>
+                `;
+            });
+        }
+
+        // 2. PEDIR STREAM (Usa la NUEVA Lambda)
+        async function pedirStream(index) {
+            if(index >= playlist.length) index = 0; // Loop
+            currentIndex = index;
+            
+            const song = playlist[index];
+            document.getElementById('now-playing').innerText = `Cargando: ${song.clean_title}...`;
+            status.innerText = "Solicitando enlace seguro a Lambda...";
+
+            try {
+                // Aquí está la magia: Pedimos la URL firmada
+                const res = await fetch(`${STREAM_API_URL}?id=${song.id}`);
+                const data = await res.json();
+
+                if (data.stream_url) {
+                    status.innerText = "Reproduciendo...";
+                    document.getElementById('now-playing').innerText = `🎵 ${data.title} - ${data.artist}`;
+                    
+                    // Asignamos la URL firmada de Google al player estándar
+                    player.src = data.stream_url;
+                    player.play();
+                } else {
+                    status.innerText = "Error: No se pudo generar el enlace.";
+                }
+            } catch (e) {
+                console.error(e);
+                status.innerText = "Error de conexión con el servidor de streaming.";
+            }
+        }
+
+        // 3. DETECTOR DE FIN DE CANCIÓN (Auto-Play)
+        player.addEventListener('ended', () => {
+            console.log("Canción terminada. Siguiente...");
+            pedirStream(currentIndex + 1);
+        });
+
+    </script>
+</body>
+</html>

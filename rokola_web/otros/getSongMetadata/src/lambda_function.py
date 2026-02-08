@@ -2,162 +2,111 @@ import json
 import boto3
 import base64
 import time
-from boto3.dynamodb.conditions import Key, Attr
+import os
+from boto3.dynamodb.conditions import Key
 from decimal import Decimal
 
-# --- CONFIGURACIÓN ---
-SECRET_KEY = "logoscontexto"
-TABLE_NAME = "MusicaStartup" # Asegúrate de que este nombre coincida con tu tabla real
+# --- CONFIGURACIÓN DE SEGURIDAD ---
+# Usa una variable de entorno en Lambda o escribe la clave aquí (mismo valor que en tu JS)
+SECRET_KEY = os.environ.get('SECRET_KEY', 'logoscontexto') 
 
-# Inicializamos recursos fuera del handler para reutilizar conexiones (Mejora de rendimiento)
 dynamodb = boto3.resource('dynamodb')
-table = dynamodb.Table(TABLE_NAME)
-
-# --- CLASES Y FUNCIONES AUXILIARES ---
+table = dynamodb.Table('MusicaStartup')
 
 class DecimalEncoder(json.JSONEncoder):
-    """
-    Ayuda a convertir los números de DynamoDB (Decimal) a JSON estándar (int/float).
-    Vital para los nuevos campos: release_year y discogs_id.
-    """
     def default(self, obj):
         if isinstance(obj, Decimal):
-            return int(obj) if obj % 1 == 0 else float(obj)
+            return float(obj)
         return super(DecimalEncoder, self).default(obj)
 
-def ofuscar_id_con_tiempo(drive_id):
-    """
-    Genera el token cifrado para el reproductor.
-    Caducidad: 15 minutos (900 segundos).
-    """
-    if not drive_id: return ""
-    
-    expiracion = int(time.time()) + 900 
-    payload = f"{drive_id}|{expiracion}"
-    
-    cifrado = []
-    key_len = len(SECRET_KEY)
-    for i, char in enumerate(payload):
-        key_char = SECRET_KEY[i % key_len]
-        xor_result = ord(char) ^ ord(key_char)
-        cifrado.append(chr(xor_result))
-    
-    texto_cifrado = "".join(cifrado)
-    return base64.b64encode(texto_cifrado.encode("utf-8")).decode("utf-8")
-
-def limpiar_datos(items):
-    """
-    Prepara la respuesta para el Frontend:
-    1. Genera el token de seguridad.
-    2. Elimina IDs reales de Google Drive.
-    3. MANTIENE los metadatos de Discogs (year, country, style) automáticamente.
-    """
-    safe_items = []
-    for item in items:
-        safe_item = item.copy()
+def ofuscar_id(drive_id):
+    """Genera un token temporal cifrado simple (XOR)"""
+    try:
+        # 1. Crear payload con expiración (ej. 1 hora)
+        expiracion = int(time.time()) + 3600 
+        payload = f"{drive_id}|{expiracion}"
         
-        # Generar Token Seguro
-        raw_id = safe_item.get('drive_file_id')
-        if raw_id:
-            safe_item['drive_token'] = ofuscar_id_con_tiempo(raw_id)
+        # 2. Cifrado XOR simple (coincide con tu frontend)
+        resultado = []
+        key_len = len(SECRET_KEY)
+        for i in range(len(payload)):
+            char_code = ord(payload[i]) ^ ord(SECRET_KEY[i % key_len])
+            resultado.append(chr(char_code))
         
-        # BORRAR DATOS SENSIBLES
-        safe_item.pop('drive_file_id', None)
-        safe_item.pop('web_view_link', None)
-        safe_item.pop('search_keywords', None) # Opcional: limpiar keywords internas para ahorrar ancho de banda
-        
-        safe_items.append(safe_item)
-    return safe_items
-
-def response(code, body):
-    return {
-        'statusCode': code,
-        'headers': {
-            'Access-Control-Allow-Origin': '*',
-            'Content-Type': 'application/json'
-        },
-        'body': json.dumps(body, cls=DecimalEncoder)
-    }
-
-# --- HANDLER PRINCIPAL ---
+        token_str = "".join(resultado)
+        # 3. Base64 para que viaje limpio
+        return base64.b64encode(token_str.encode('utf-8')).decode('utf-8')
+    except Exception as e:
+        print(f"Error ofuscando: {e}")
+        return None
 
 def lambda_handler(event, context):
-    # Manejo de parámetros queryStringParameters (puede venir None)
-    params = event.get('queryStringParameters') or {}
-    
-    if not params:
-        return response(400, {'error': 'Faltan parámetros. Usa ?q=busqueda'})
+    query_param = None
+    if event.get('queryStringParameters'):
+        query_param = event['queryStringParameters'].get('q')
+    elif event.get('body'):
+        try:
+            body = json.loads(event['body'])
+            query_param = body.get('q')
+        except:
+            pass
+
+    if not query_param:
+        return {'statusCode': 400, 'body': json.dumps({'error': 'Falta q'})}
+
+    search_term = query_param.strip()
+    print(f"🔎 Buscando: '{search_term}'")
 
     try:
-        # ---------------------------------------------------------
-        # 1. BÚSQUEDA POR ID (Para reproducir directo)
-        # ---------------------------------------------------------
-        if 'id' in params:
-            item = table.get_item(Key={'id': params['id']}).get('Item')
-            if item: 
-                cleaned_list = limpiar_datos([item])
-                return response(200, cleaned_list[0])
-            return response(404, {'error': 'ID no encontrado'})
+        items = []
+        
+        # 1. Búsqueda por ARTISTA (Index nuevo)
+        response = table.query(
+            IndexName='BusquedaGlobal',
+            KeyConditionExpression=Key('tipo').eq('CATALOGO') & Key('artist').begins_with(search_term)
+        )
+        items = response.get('Items', [])
 
-        # ---------------------------------------------------------
-        # 2. BÚSQUEDA INTELIGENTE (Parámetro ?q=)
-        # ---------------------------------------------------------
-        if 'q' in params:
-            raw_query = params['q'].strip()
-            user_query = raw_query.lower()
+        # 2. Búsqueda por TÍTULO (Fallback)
+        if len(items) == 0:
+            print("   -> Intentando por Título exacto...")
+            response_title = table.query(
+                IndexName='TitleIndex',
+                KeyConditionExpression=Key('clean_title').eq(search_term)
+            )
+            items.extend(response_title.get('Items', []))
+
+        # --- 🛡️ CAPA DE SEGURIDAD Y LIMPIEZA ---
+        items_seguros = []
+        for item in items:
+            drive_id = item.get('drive_file_id')
             
-            if not user_query:
-                return response(400, {'error': 'Consulta vacía'})
-
-            # --- ESTRATEGIA A: Atajo por Artista (Rápido y barato) ---
-            # Intenta ver si lo que escribieron es exactamente el inicio de un nombre de artista
-            try:
-                artist_guess = raw_query.title() # Ej: "Rocio" -> "Rocio"
-                result_fast = table.query(
-                    IndexName='ArtistIndex',
-                    KeyConditionExpression=Key('artist').begins_with(artist_guess)
-                )
-                items_shortcut = result_fast.get('Items', [])
-                
-                # Si encontramos algo sustancial, retornamos eso y evitamos el SCAN costoso
-                if len(items_shortcut) > 0:
-                    print(f"🚀 Atajo funcionó para: {artist_guess}")
-                    return response(200, limpiar_datos(items_shortcut))
-            except Exception as e:
-                print(f"⚠️ Atajo falló (continuando con scan): {e}")
-
-            # --- ESTRATEGIA B: Scan Profundo (Búsqueda completa) ---
-            print(f"🐢 Iniciando Scan completo para: {user_query}")
-            words = user_query.split()
+            # Si tiene ID, generamos el token seguro
+            if drive_id:
+                item['drive_token'] = ofuscar_id(drive_id)
             
-            # Construimos filtro dinámico para todas las palabras
-            filter_exp = Attr('search_keywords').contains(words[0])
-            for w in words[1:]:
-                filter_exp = filter_exp & Attr('search_keywords').contains(w)
+            # 🚨 IMPORTANTE: Borrar el ID original y enlaces directos
+            item.pop('drive_file_id', None)
+            item.pop('web_view_link', None) # Si tenías el link directo de view, bórralo también
+            item.pop('search_keywords', None) # No hace falta enviarlo al front
+            
+            # Solo agregamos si logramos generar token (o si es metadata pública)
+            items_seguros.append(item)
 
-            # Ejecutamos Scan paginado
-            response_scan = table.scan(FilterExpression=filter_exp)
-            data = response_scan.get('Items', [])
+        return {
+            'statusCode': 200,
+            'headers': {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Headers': 'Content-Type',
+                'Access-Control-Allow-Methods': 'OPTIONS,POST,GET'
+            },
+            'body': json.dumps(items_seguros, cls=DecimalEncoder)
+        }
 
-            # Paginación limitada para proteger la Lambda (max 3MB o 10 pags)
-            pages_read = 1
-            while 'LastEvaluatedKey' in response_scan:
-                if len(data) >= 50: 
-                    break # Ya tenemos suficientes resultados
-                if pages_read > 5:
-                    break # Evitar timeout de Lambda
-
-                response_scan = table.scan(
-                    FilterExpression=filter_exp,
-                    ExclusiveStartKey=response_scan['LastEvaluatedKey']
-                )
-                data.extend(response_scan.get('Items', []))
-                pages_read += 1
-
-            return response(200, limpiar_datos(data))
-
-        return response(400, {'error': 'Parámetro no soportado. Usa ?q=, ?id= o ?artist='})
-    
     except Exception as e:
-        print(f"❌ Error CRÍTICO: {str(e)}")
-        return response(500, {'error': 'Error interno del servidor', 'details': str(e)})
+        print(f"❌ Error: {str(e)}")
+        return {
+            'statusCode': 500,
+            'headers': {'Access-Control-Allow-Origin': '*'},
+            'body': json.dumps({'error': str(e)})
+        }
